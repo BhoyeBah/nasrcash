@@ -59,6 +59,16 @@ async def _clean_tables():
             await conn.exec_driver_sql(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
 
 
+@pytest.fixture(autouse=True)
+async def _seed_fx_rates():
+    from app.modules.fx.seed import seed_fx_rates
+
+    async with TestSessionLocal() as session:
+        await seed_fx_rates(session)
+        await session.commit()
+    yield
+
+
 @pytest.fixture
 async def db_session() -> AsyncSession:
     async with TestSessionLocal() as session:

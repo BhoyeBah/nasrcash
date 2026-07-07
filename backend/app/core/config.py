@@ -29,9 +29,10 @@ class Settings(BaseSettings):
     max_login_attempts: int = 5
     login_lockout_minutes: int = 15
 
-    # MVP flat rate; a data-driven fees_rules table (per country/provider/KYC
-    # level) replaces this once the fee catalogue grows past the pilot.
+    # MVP flat rates; a data-driven fees_rules table (per country/provider/KYC
+    # level) replaces these once the fee catalogue grows past the pilot.
     topup_fee_percent: str = "0.02"
+    payment_fee_percent: str = "0.03"
 
     @property
     def is_production(self) -> bool:

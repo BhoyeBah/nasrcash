@@ -8,6 +8,8 @@ from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.cards.schemas import CardBalanceResponse, CardFundRequest, CardResponse
 from app.modules.cards.service import CardService
+from app.modules.payments.schemas import CardPaymentResponse
+from app.modules.payments.service import PaymentService
 from app.modules.wallets.schemas import LedgerEntryResponse
 
 router = APIRouter(prefix="/api/v1/cards", tags=["cards"])
@@ -106,3 +108,15 @@ async def get_card_transactions(
     service = CardService(db)
     card = await service.get_card(card_id, current_user.id)
     return await service.get_transactions(card)
+
+
+@router.get("/{card_id}/payments", response_model=list[CardPaymentResponse])
+async def get_card_payments(
+    card_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    card_service = CardService(db)
+    card = await card_service.get_card(card_id, current_user.id)
+    payment_service = PaymentService(db)
+    return await payment_service.list_for_card(card.id)
