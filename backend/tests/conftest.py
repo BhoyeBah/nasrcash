@@ -28,6 +28,7 @@ TestSessionLocal = async_sessionmaker(bind=test_engine, expire_on_commit=False)
 
 @pytest.fixture(scope="session", autouse=True)
 def _prepare_database():
+    from app.modules.admin.seed import seed_bootstrap_admin
     from app.modules.countries.seed import seed_countries
 
     async def _create():
@@ -36,6 +37,7 @@ def _prepare_database():
             await conn.run_sync(Base.metadata.create_all)
         async with TestSessionLocal() as session:
             await seed_countries(session)
+            await seed_bootstrap_admin(session)
             await session.commit()
 
     asyncio.run(_create())
@@ -43,7 +45,7 @@ def _prepare_database():
 
 
 # Reference/config tables seeded once for the whole test session — never wiped between tests.
-REFERENCE_TABLES = {"countries"}
+REFERENCE_TABLES = {"countries", "admin_users"}
 
 
 @pytest.fixture(autouse=True)

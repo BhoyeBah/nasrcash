@@ -18,6 +18,7 @@ pin_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
+    ADMIN_ACCESS = "admin_access"
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,16 @@ def create_access_token(user_id: uuid.UUID | str) -> IssuedToken:
     return _create_token(
         str(user_id),
         TokenType.ACCESS,
+        timedelta(minutes=settings.jwt_access_token_expire_minutes),
+    )
+
+
+def create_admin_access_token(admin_id: uuid.UUID | str) -> IssuedToken:
+    # Deliberately separate token type from the mobile user's ACCESS token —
+    # a leaked user token must never authenticate against admin endpoints.
+    return _create_token(
+        str(admin_id),
+        TokenType.ADMIN_ACCESS,
         timedelta(minutes=settings.jwt_access_token_expire_minutes),
     )
 

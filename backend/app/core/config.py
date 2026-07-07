@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     topup_fee_percent: str = "0.02"
     payment_fee_percent: str = "0.03"
 
+    # Bootstrap super_admin created by the seed migration — change immediately
+    # in any non-sandbox environment.
+    admin_bootstrap_email: str = "admin@nasrcash.com"
+    admin_bootstrap_password: str = "ChangeMe123!"
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"

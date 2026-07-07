@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
+from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
 from app.modules.kyc.router import router as kyc_router
 from app.modules.notifications.router import router as notifications_router
@@ -26,6 +27,7 @@ app.include_router(wallets_router)
 app.include_router(topups_router)
 app.include_router(cards_router)
 app.include_router(notifications_router)
+app.include_router(admin_router)
 app.include_router(sandbox_router)
 
 

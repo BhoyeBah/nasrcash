@@ -18,3 +18,4 @@ def import_all_models() -> None:
     from app.modules.fx import models as fx_models  # noqa: F401
     from app.modules.payments import models as payments_models  # noqa: F401
     from app.modules.notifications import models as notifications_models  # noqa: F401
+    from app.modules.admin import models as admin_models  # noqa: F401
