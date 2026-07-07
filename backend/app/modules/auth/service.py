@@ -20,6 +20,7 @@ from app.core.security import (
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import OtpCode, OtpPurpose, RefreshToken, User, UserStatus
 from app.modules.countries.models import Country
+from app.modules.wallets.service import WalletService
 
 settings = get_settings()
 logger = logging.getLogger("nasrcash.auth")
@@ -115,6 +116,10 @@ class AuthService:
         )
         self.db.add(user)
         await self.db.flush()
+
+        await WalletService(self.db).create_wallet_for_user(
+            user.id, country_code, country.currency_code
+        )
 
         otp_code = await self._issue_otp(user, OtpPurpose.REGISTRATION)
         await self.audit.log(
