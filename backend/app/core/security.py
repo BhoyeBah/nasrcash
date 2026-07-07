@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Any
@@ -19,27 +20,43 @@ class TokenType(StrEnum):
     REFRESH = "refresh"
 
 
-def hash_pin(pin: str) -> str:
-    return pin_context.hash(pin)
+@dataclass(frozen=True)
+class IssuedToken:
+    token: str
+    jti: str
+    expires_at: datetime
 
 
-def verify_pin(pin: str, pin_hash: str) -> bool:
-    return pin_context.verify(pin, pin_hash)
+def hash_secret(secret: str) -> str:
+    """Bcrypt-hash a short secret (PIN or OTP code). Never store either in clear."""
+    return pin_context.hash(secret)
 
 
-def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> str:
+def verify_secret(secret: str, secret_hash: str) -> bool:
+    return pin_context.verify(secret, secret_hash)
+
+
+# Aliases kept for call-site clarity.
+hash_pin = hash_secret
+verify_pin = verify_secret
+
+
+def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> IssuedToken:
     now = datetime.now(timezone.utc)
+    expires_at = now + expires_delta
+    jti = str(uuid.uuid4())
     payload: dict[str, Any] = {
         "sub": subject,
         "type": token_type.value,
         "iat": now,
-        "exp": now + expires_delta,
-        "jti": str(uuid.uuid4()),
+        "exp": expires_at,
+        "jti": jti,
     }
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return IssuedToken(token=token, jti=jti, expires_at=expires_at)
 
 
-def create_access_token(user_id: uuid.UUID | str) -> str:
+def create_access_token(user_id: uuid.UUID | str) -> IssuedToken:
     return _create_token(
         str(user_id),
         TokenType.ACCESS,
@@ -47,7 +64,7 @@ def create_access_token(user_id: uuid.UUID | str) -> str:
     )
 
 
-def create_refresh_token(user_id: uuid.UUID | str) -> str:
+def create_refresh_token(user_id: uuid.UUID | str) -> IssuedToken:
     return _create_token(
         str(user_id),
         TokenType.REFRESH,
