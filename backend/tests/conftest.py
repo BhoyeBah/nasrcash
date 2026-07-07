@@ -1,10 +1,12 @@
 import asyncio
 import os
+import tempfile
 
 os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://nasrcash:nasrcash@localhost:5432/nasrcash_test"
 )
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("KYC_STORAGE_PATH", tempfile.mkdtemp(prefix="nasrcash-kyc-test-"))
 
 import pytest
 from httpx import ASGITransport, AsyncClient

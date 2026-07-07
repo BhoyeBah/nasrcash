@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     jwt_refresh_token_expire_days: int = 30
 
     sandbox_mode: bool = True
+    kyc_storage_path: str = "./storage/kyc"
 
     default_country_code: str = "GN"
     default_currency_code: str = "GNF"
