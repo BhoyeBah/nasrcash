@@ -4,6 +4,8 @@ from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.modules.auth.router import router as auth_router
 from app.modules.kyc.router import router as kyc_router
+from app.modules.sandbox.router import router as sandbox_router
+from app.modules.topups.router import router as topups_router
 from app.modules.wallets.router import router as wallets_router
 
 settings = get_settings()
@@ -19,6 +21,8 @@ register_exception_handlers(app)
 app.include_router(auth_router)
 app.include_router(kyc_router)
 app.include_router(wallets_router)
+app.include_router(topups_router)
+app.include_router(sandbox_router)
 
 
 @app.get("/health", tags=["health"])
