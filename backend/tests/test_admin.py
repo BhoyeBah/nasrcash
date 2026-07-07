@@ -86,6 +86,89 @@ async def test_admin_list_kyc_pending(client):
     assert isinstance(response.json(), list)
 
 
+async def test_admin_can_approve_a_pending_kyc_profile(client, db_session):
+    from app.modules.kyc.models import KycProfile, KycStatus
+
+    phone = "+224688888805"
+    await _register_user(client, phone)
+
+    users_resp = await client.get(
+        "/api/v1/admin/users", headers=await _admin_headers(client)
+    )
+    user = next(u for u in users_resp.json() if u["phone"] == phone)
+
+    profile = KycProfile(
+        user_id=user["id"], level_requested=1, status=KycStatus.SUBMITTED.value
+    )
+    db_session.add(profile)
+    await db_session.commit()
+
+    admin_headers = await _admin_headers(client)
+    response = await client.post(
+        f"/api/v1/admin/kyc/{profile.id}/approve", headers=admin_headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "approved"
+
+
+async def test_admin_can_reject_a_pending_kyc_profile(client, db_session):
+    from app.modules.kyc.models import KycProfile, KycStatus
+
+    phone = "+224688888806"
+    await _register_user(client, phone)
+
+    users_resp = await client.get(
+        "/api/v1/admin/users", headers=await _admin_headers(client)
+    )
+    user = next(u for u in users_resp.json() if u["phone"] == phone)
+
+    profile = KycProfile(
+        user_id=user["id"], level_requested=1, status=KycStatus.SUBMITTED.value
+    )
+    db_session.add(profile)
+    await db_session.commit()
+
+    admin_headers = await _admin_headers(client)
+    response = await client.post(
+        f"/api/v1/admin/kyc/{profile.id}/reject",
+        headers=admin_headers,
+        json={"reason": "document illisible"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "rejected"
+
+
+async def test_kyc_approve_reject_require_reviewer_role(client, db_session):
+    from app.core.security import create_admin_access_token
+    from app.modules.admin.models import AdminUser
+    from app.modules.kyc.models import KycProfile, KycStatus
+
+    phone = "+224688888807"
+    await _register_user(client, phone)
+    users_resp = await client.get(
+        "/api/v1/admin/users", headers=await _admin_headers(client)
+    )
+    user = next(u for u in users_resp.json() if u["phone"] == phone)
+
+    profile = KycProfile(
+        user_id=user["id"], level_requested=1, status=KycStatus.SUBMITTED.value
+    )
+    db_session.add(profile)
+
+    support_admin = AdminUser(
+        email="support@nasrcash.com", password_hash="x", role="support_agent"
+    )
+    db_session.add(support_admin)
+    await db_session.commit()
+
+    token = create_admin_access_token(support_admin.id)
+    response = await client.post(
+        f"/api/v1/admin/kyc/{profile.id}/approve",
+        headers={"Authorization": f"Bearer {token.token}"},
+    )
+    assert response.status_code == 403
+
+
 async def test_admin_transactions_lists_ledger_entries(client, db_session):
     from decimal import Decimal
 

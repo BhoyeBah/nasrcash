@@ -37,6 +37,10 @@ class AdminUserListItem(BaseModel):
     created_at: datetime
 
 
+class AdminKycRejectRequest(BaseModel):
+    reason: str
+
+
 class AdminKycPendingItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
