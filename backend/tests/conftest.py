@@ -6,6 +6,7 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://nasrcash:nasrcash@localhost:5432/nasrcash_test"
 )
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 os.environ.setdefault("KYC_STORAGE_PATH", tempfile.mkdtemp(prefix="nasrcash-kyc-test-"))
 
 import pytest
@@ -59,6 +60,15 @@ async def _clean_tables():
         )
         if table_names:
             await conn.exec_driver_sql(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE")
+
+
+@pytest.fixture(autouse=True)
+async def _flush_rate_limits():
+    from app.core.rate_limit import get_redis
+
+    redis = get_redis()
+    await redis.flushdb()
+    yield
 
 
 @pytest.fixture(autouse=True)

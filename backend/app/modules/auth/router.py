@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.rate_limit import rate_limiter
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
@@ -25,7 +26,12 @@ settings = get_settings()
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limiter("register", max_requests=5, window_seconds=3600))],
+)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     user, otp_code = await service.register(payload.phone, payload.country_code, payload.pin)
@@ -38,7 +44,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     )
 
 
-@router.post("/verify-otp", response_model=TokenPairResponse)
+@router.post(
+    "/verify-otp",
+    response_model=TokenPairResponse,
+    dependencies=[Depends(rate_limiter("verify-otp", max_requests=10, window_seconds=600))],
+)
 async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     access, refresh = await service.verify_otp(
@@ -48,7 +58,11 @@ async def verify_otp(payload: VerifyOtpRequest, db: AsyncSession = Depends(get_d
     return TokenPairResponse(access_token=access.token, refresh_token=refresh.token)
 
 
-@router.post("/login", response_model=TokenPairResponse)
+@router.post(
+    "/login",
+    response_model=TokenPairResponse,
+    dependencies=[Depends(rate_limiter("login", max_requests=10, window_seconds=300))],
+)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     access, refresh = await service.login(
@@ -86,7 +100,11 @@ async def change_pin(
     return MessageResponse(message="PIN modifié avec succès")
 
 
-@router.post("/forgot-pin", response_model=ForgotPinResponse)
+@router.post(
+    "/forgot-pin",
+    response_model=ForgotPinResponse,
+    dependencies=[Depends(rate_limiter("forgot-pin", max_requests=5, window_seconds=3600))],
+)
 async def forgot_pin(payload: ForgotPinRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     otp_code = await service.forgot_pin(payload.phone)
@@ -98,7 +116,11 @@ async def forgot_pin(payload: ForgotPinRequest, db: AsyncSession = Depends(get_d
     )
 
 
-@router.post("/reset-pin", response_model=MessageResponse)
+@router.post(
+    "/reset-pin",
+    response_model=MessageResponse,
+    dependencies=[Depends(rate_limiter("reset-pin", max_requests=10, window_seconds=600))],
+)
 async def reset_pin(payload: ResetPinRequest, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     await service.reset_pin(payload.phone, payload.code, payload.new_pin)

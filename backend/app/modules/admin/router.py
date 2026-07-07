@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.permissions import AdminRole
+from app.core.rate_limit import rate_limiter
 from app.core.security import create_admin_access_token
 from app.modules.admin.dependencies import require_admin_roles
 from app.modules.admin.schemas import (
@@ -29,7 +30,11 @@ KYC_VISIBILITY_ROLES = {
 }
 
 
-@router.post("/auth/login", response_model=AdminTokenResponse)
+@router.post(
+    "/auth/login",
+    response_model=AdminTokenResponse,
+    dependencies=[Depends(rate_limiter("admin-login", max_requests=10, window_seconds=300))],
+)
 async def admin_login(payload: AdminLoginRequest, db: AsyncSession = Depends(get_db)):
     service = AdminService(db)
     admin = await service.authenticate(payload.email, payload.password)

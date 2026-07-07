@@ -45,6 +45,11 @@ class InsufficientBalanceError(NasrCashError):
     error_code = "insufficient_balance"
 
 
+class RateLimitError(NasrCashError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    error_code = "rate_limited"
+
+
 class LedgerImbalanceError(NasrCashError):
     """Raised when a ledger transaction's debits and credits do not balance.
 
