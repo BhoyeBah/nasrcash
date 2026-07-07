@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f8fa;
+  --foreground: #14181f;
+  --card: #ffffff;
+  --card-foreground: #14181f;
+  --border: #e3e6ea;
+  --muted: #f0f2f5;
+  --muted-foreground: #616b77;
+  --primary: #145a3e;
+  --primary-foreground: #ffffff;
+  --accent: #eef6f1;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --success: #1a7f4e;
+  --warning: #a15c00;
+  --ring: #145a3e;
+}
+
+:root[data-theme="dark"] {
+  --background: #0e1116;
+  --foreground: #eef1f4;
+  --card: #161a21;
+  --card-foreground: #eef1f4;
+  --border: #262b33;
+  --muted: #1b1f27;
+  --muted-foreground: #97a1ad;
+  --primary: #35c485;
+  --primary-foreground: #06120c;
+  --accent: #142019;
+  --destructive: #ff6b64;
+  --destructive-foreground: #2a0906;
+  --success: #35c485;
+  --warning: #e2a53d;
+  --ring: #35c485;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0e1116;
+    --foreground: #eef1f4;
+    --card: #161a21;
+    --card-foreground: #eef1f4;
+    --border: #262b33;
+    --muted: #1b1f27;
+    --muted-foreground: #97a1ad;
+    --primary: #35c485;
+    --primary-foreground: #06120c;
+    --accent: #142019;
+    --destructive: #ff6b64;
+    --destructive-foreground: #2a0906;
+    --success: #35c485;
+    --warning: #e2a53d;
+    --ring: #35c485;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-ring: var(--ring);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
