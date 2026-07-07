@@ -20,6 +20,8 @@ from app.core.security import (
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import OtpCode, OtpPurpose, RefreshToken, User, UserStatus
 from app.modules.countries.models import Country
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 from app.modules.wallets.service import WalletService
 
 settings = get_settings()
@@ -34,6 +36,7 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
 
     async def _get_user_by_phone(self, phone: str) -> User | None:
         result = await self.db.execute(select(User).where(User.phone == phone))
@@ -119,6 +122,10 @@ class AuthService:
 
         await WalletService(self.db).create_wallet_for_user(
             user.id, country_code, country.currency_code
+        )
+        await self.notifications.create(
+            user.id, NotificationType.ACCOUNT_CREATED.value,
+            "Bienvenue sur NasrCash", "Votre compte a été créé avec succès.",
         )
 
         otp_code = await self._issue_otp(user, OtpPurpose.REGISTRATION)

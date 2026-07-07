@@ -19,12 +19,15 @@ from app.modules.kyc.models import (
     KycProfile,
     KycStatus,
 )
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 
 
 class KycService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
 
     async def _latest_profile(self, user_id) -> KycProfile | None:
         result = await self.db.execute(
@@ -116,6 +119,10 @@ class KycService:
             actor_type="user", actor_id=user.id, action="kyc.submitted",
             target_type="kyc_profile", target_id=str(profile.id),
         )
+        await self.notifications.create(
+            user.id, NotificationType.KYC_SUBMITTED.value,
+            "Vérification KYC soumise", "Votre dossier est en cours de traitement.",
+        )
 
         # Sandbox-only: no human reviewer or partner API exists yet, so the
         # submission is auto-reviewed and approved synchronously.
@@ -134,6 +141,10 @@ class KycService:
         await self.audit.log(
             actor_type="system", action="kyc.auto_approved", target_type="kyc_profile",
             target_id=str(profile.id), context={"level": profile.level_requested},
+        )
+        await self.notifications.create(
+            user.id, NotificationType.KYC_APPROVED.value,
+            "KYC approuvé", f"Votre niveau KYC {profile.level_requested} a été approuvé.",
         )
 
     async def get_status(self, user: User) -> tuple[KycProfile | None, list[KycDocument]]:
@@ -161,6 +172,10 @@ class KycService:
             actor_type="admin", action="kyc.approved", target_type="kyc_profile",
             target_id=str(profile.id), context={"reviewer_id": reviewer_id},
         )
+        await self.notifications.create(
+            user.id, NotificationType.KYC_APPROVED.value,
+            "KYC approuvé", f"Votre niveau KYC {profile.level_requested} a été approuvé.",
+        )
         return profile
 
     async def reject(self, profile_id, reviewer_id: str, reason: str) -> KycProfile:
@@ -178,6 +193,10 @@ class KycService:
         await self.audit.log(
             actor_type="admin", action="kyc.rejected", target_type="kyc_profile",
             target_id=str(profile.id), context={"reviewer_id": reviewer_id, "reason": reason},
+        )
+        await self.notifications.create(
+            profile.user_id, NotificationType.KYC_REJECTED.value,
+            "KYC rejeté", f"Votre dossier KYC a été rejeté : {reason}",
         )
         return profile
 

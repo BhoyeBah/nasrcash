@@ -10,6 +10,8 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
 from app.modules.fees.service import calculate_topup_fee
 from app.modules.ledger.service import LedgerService
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 from app.modules.providers.registry import get_payment_provider
 from app.modules.topups.models import Topup, TopupStatus
 from app.modules.wallets.service import WalletService, wallet_account_id
@@ -25,6 +27,7 @@ class TopupService:
         self.ledger = LedgerService(db)
         self.wallets = WalletService(db)
         self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Topup:
         if amount <= 0:
@@ -115,6 +118,11 @@ class TopupService:
         await self.audit.log(
             actor_type="system", action="topup.success", target_type="topup",
             target_id=str(topup.id),
+        )
+        await self.notifications.create(
+            topup.user_id, NotificationType.TOPUP_RECEIVED.value,
+            "Recharge reçue",
+            f"Votre wallet a été crédité de {topup.net_amount} {topup.currency_code}.",
         )
         return topup
 

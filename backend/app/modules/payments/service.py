@@ -11,6 +11,8 @@ from app.modules.cards.service import card_account_id
 from app.modules.fees.service import calculate_payment_fee
 from app.modules.fx.service import FXService
 from app.modules.ledger.service import LedgerService
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 from app.modules.payments.models import CardPayment, DeclineReason, PaymentStatus
 
 
@@ -27,6 +29,7 @@ class PaymentService:
         self.ledger = LedgerService(db)
         self.fx = FXService(db)
         self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
 
     async def get_payment(self, payment_id: uuid.UUID) -> CardPayment:
         payment = await self.db.get(CardPayment, payment_id)
@@ -79,6 +82,12 @@ class PaymentService:
         await self.audit.log(
             actor_type="system", action="payment.declined", target_type="card_payment",
             target_id=str(payment.id), context={"reason": reason},
+        )
+        await self.notifications.create(
+            card.user_id, NotificationType.PAYMENT_DECLINED.value,
+            "Paiement refusé",
+            f"Paiement de {merchant_amount} {merchant_currency} chez {merchant_name} refusé "
+            f"({reason}).",
         )
         return payment
 
@@ -169,6 +178,12 @@ class PaymentService:
             actor_type="system", action="payment.settled", target_type="card_payment",
             target_id=str(payment.id),
             context={"merchant": merchant_name, "total_debited": str(total_debited)},
+        )
+        await self.notifications.create(
+            card.user_id, NotificationType.PAYMENT_ACCEPTED.value,
+            "Paiement accepté",
+            f"Paiement de {merchant_amount} {merchant_currency} chez {merchant_name} accepté "
+            f"— {total_debited} {card.displayed_currency} débités.",
         )
         return payment
 

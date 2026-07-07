@@ -16,6 +16,8 @@ from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
 from app.modules.ledger.models import LedgerEntry
 from app.modules.ledger.service import LedgerService
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 from app.modules.providers.registry import get_card_provider
 from app.modules.wallets.service import WalletService, wallet_account_id
 
@@ -32,6 +34,7 @@ class CardService:
         self.ledger = LedgerService(db)
         self.wallets = WalletService(db)
         self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
         self.provider = get_card_provider()
 
     async def issue_card(self, user: User) -> Card:
@@ -61,6 +64,10 @@ class CardService:
             actor_type="user", actor_id=user.id, action="card.issued", target_type="card",
             target_id=str(card.id),
         )
+        await self.notifications.create(
+            user.id, NotificationType.CARD_CREATED.value,
+            "Carte créée", f"Votre carte virtuelle {card.masked_pan} est prête.",
+        )
         return card
 
     async def get_card(self, card_id: uuid.UUID, user_id: uuid.UUID) -> Card:
@@ -84,6 +91,10 @@ class CardService:
         await self.audit.log(
             actor_type="user", actor_id=card.user_id, action="card.frozen", target_type="card",
             target_id=str(card.id),
+        )
+        await self.notifications.create(
+            card.user_id, NotificationType.CARD_FROZEN.value,
+            "Carte gelée", f"Votre carte {card.masked_pan} a été gelée.",
         )
         return card
 
@@ -164,5 +175,10 @@ class CardService:
         await self.audit.log(
             actor_type="user", actor_id=user.id, action="card.funded", target_type="card",
             target_id=str(card.id), context={"amount": str(amount)},
+        )
+        await self.notifications.create(
+            user.id, NotificationType.CARD_FUNDED.value,
+            "Carte rechargée",
+            f"Votre carte {card.masked_pan} a été rechargée de {amount} {card.displayed_currency}.",
         )
         return card
