@@ -97,6 +97,16 @@ async def test_card_issuance_succeeds_at_kyc2(client):
     assert "4242" not in body["masked_pan"] or "*" in body["masked_pan"]
 
 
+async def test_get_card_balance_starts_at_zero(client):
+    headers = await _kyc2_user_headers(client, "+224655555512")
+    card_resp = await client.post("/api/v1/cards", headers=headers)
+    card_id = card_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/cards/{card_id}/balance", headers=headers)
+    assert response.status_code == 200
+    assert Decimal(response.json()["available_balance"]) == Decimal("0")
+
+
 async def test_card_never_exposes_full_pan(client):
     headers = await _kyc2_user_headers(client, "+224655555504")
     response = await client.post("/api/v1/cards", headers=headers)
@@ -124,6 +134,10 @@ async def test_fund_card_from_wallet(client, db_session):
     wallet_id = wallets_resp.json()[0]["id"]
     balance_resp = await client.get(f"/api/v1/wallets/{wallet_id}/balance", headers=headers)
     assert Decimal(balance_resp.json()["available_balance"]) == Decimal("700000")
+
+    card_balance_resp = await client.get(f"/api/v1/cards/{card_id}/balance", headers=headers)
+    assert card_balance_resp.status_code == 200
+    assert Decimal(card_balance_resp.json()["available_balance"]) == Decimal("300000")
 
 
 async def test_fund_card_insufficient_wallet_balance(client):

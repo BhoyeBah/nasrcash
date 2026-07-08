@@ -43,6 +43,21 @@ async def get_card(
     return await service.get_card(card_id, current_user.id)
 
 
+@router.get("/{card_id}/balance", response_model=CardBalanceResponse)
+async def get_card_balance(
+    card_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = CardService(db)
+    card = await service.get_card(card_id, current_user.id)
+    balance = await service.get_balance(card)
+    await db.commit()
+    return CardBalanceResponse(
+        card_id=card.id, currency_code=card.displayed_currency, available_balance=balance
+    )
+
+
 @router.post("/{card_id}/fund", response_model=CardBalanceResponse)
 async def fund_card(
     card_id: uuid.UUID,
