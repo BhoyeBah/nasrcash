@@ -39,6 +39,7 @@ import com.nasrcash.app.ui.common.nasrCashViewModel
 @Composable
 fun HomeScreen(
     onOpenTopup: () -> Unit,
+    onOpenWithdrawal: () -> Unit,
     onOpenKyc: () -> Unit,
     onOpenCard: (String) -> Unit,
     onOpenHistory: (String) -> Unit,
@@ -76,6 +77,7 @@ fun HomeScreen(
                 data = currentState.data,
                 modifier = Modifier.padding(padding),
                 onOpenTopup = onOpenTopup,
+                onOpenWithdrawal = onOpenWithdrawal,
                 onOpenKyc = onOpenKyc,
                 onOpenCard = onOpenCard,
                 onOpenHistory = onOpenHistory,
@@ -89,6 +91,7 @@ private fun HomeContent(
     data: HomeData,
     modifier: Modifier = Modifier,
     onOpenTopup: () -> Unit,
+    onOpenWithdrawal: () -> Unit,
     onOpenKyc: () -> Unit,
     onOpenCard: (String) -> Unit,
     onOpenHistory: (String) -> Unit,
@@ -112,6 +115,10 @@ private fun HomeContent(
                     )
                     Row(modifier = Modifier.padding(top = 12.dp)) {
                         Button(onClick = onOpenTopup) { Text("Recharger") }
+                        OutlinedButton(
+                            onClick = onOpenWithdrawal,
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("Retirer") }
                         OutlinedButton(
                             onClick = { onOpenHistory(data.wallet.id) },
                             modifier = Modifier.padding(start = 8.dp),

@@ -53,6 +53,23 @@ interface ApiService {
     @POST("api/v1/sandbox/topups/{topupId}/simulate-success")
     suspend fun simulateTopupSuccess(@Path("topupId") topupId: String): TopupResponse
 
+    // --- withdrawals ---
+    @POST("api/v1/wallets/{walletId}/withdrawals")
+    suspend fun createWithdrawal(
+        @Path("walletId") walletId: String,
+        @Body body: WithdrawalRequest,
+    ): WithdrawalResponse
+
+    @GET("api/v1/withdrawals")
+    suspend fun listWithdrawals(): List<WithdrawalResponse>
+
+    @GET("api/v1/withdrawals/{withdrawalId}")
+    suspend fun getWithdrawal(@Path("withdrawalId") withdrawalId: String): WithdrawalResponse
+
+    // Sandbox-only, same rationale as simulateTopupSuccess above.
+    @POST("api/v1/sandbox/withdrawals/{withdrawalId}/simulate-success")
+    suspend fun simulateWithdrawalSuccess(@Path("withdrawalId") withdrawalId: String): WithdrawalResponse
+
     // --- KYC ---
     @POST("api/v1/kyc/start")
     suspend fun startKyc(): KycProfileResponse

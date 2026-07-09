@@ -6,6 +6,7 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val TOPUP = "topup"
+    const val WITHDRAWAL = "withdrawal"
     const val KYC = "kyc"
     const val CARD_DETAIL = "card/{cardId}"
     const val HISTORY = "history/{walletId}"

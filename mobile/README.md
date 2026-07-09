@@ -1,8 +1,9 @@
 # NasrCash Mobile (Android)
 
 Kotlin + Jetpack Compose client for the NasrCash sandbox MVP — onboarding/OTP,
-PIN + biometric unlock, wallet overview, deposits, KYC document upload,
-virtual card management, transaction history, and notifications. See
+PIN + biometric unlock, wallet overview, deposits and withdrawals, KYC
+document upload, virtual card management, transaction history, and
+notifications. See
 `../CAHIER_DES_CHARGES_NASRCASH.md` and `../NASRCASH_TECH_SPEC.md` for the
 full product and technical specification.
 
@@ -62,17 +63,15 @@ Key rules carried over from the backend's discipline:
 - **Money-moving calls are idempotent.** `CardRepository.fund()` generates a
   fresh idempotency key per user tap, matching the backend's
   `idempotency_key` contract on `POST /cards/{id}/fund`.
-- **Sandbox is explicit in the UI**, not hidden: the topup screen shows a
-  distinct "pending → confirm (sandbox)" step rather than pretending a real
-  Mobile Money webhook fired, so the mismatch with a future real integration
-  is obvious.
+- **Sandbox is explicit in the UI**, not hidden: the topup and withdrawal
+  screens both show a distinct "pending → confirm (sandbox)" step rather than
+  pretending a real Mobile Money webhook fired, so the mismatch with a future
+  real integration is obvious.
 
 ## Known gaps / next steps
 
 - Push notifications (FCM/OneSignal) are not wired up — the spec marks this
   optional ("seulement si le temps le permet"); only in-app notifications
   (polling `GET /notifications`) are implemented.
-- No withdrawal ("retrait") screen — the backend doesn't expose a withdrawal
-  endpoint yet either (topups/deposits only), so there was nothing to call.
-- No automated instrumentation/unit tests yet (the backend's 79 pytest tests
-  cover the business logic these screens call).
+- No automated instrumentation/unit tests yet (the backend's pytest suite
+  covers the business logic these screens call).

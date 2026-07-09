@@ -29,6 +29,7 @@ import com.nasrcash.app.ui.notifications.NotificationsScreen
 import com.nasrcash.app.ui.onboarding.OtpScreen
 import com.nasrcash.app.ui.onboarding.RegisterScreen
 import com.nasrcash.app.ui.topup.TopupScreen
+import com.nasrcash.app.ui.withdrawal.WithdrawalScreen
 
 @Composable
 fun NasrCashNavHost(navController: NavHostController = rememberNavController()) {
@@ -73,6 +74,7 @@ fun NasrCashNavHost(navController: NavHostController = rememberNavController()) 
         composable(Routes.HOME) {
             HomeScreen(
                 onOpenTopup = { navController.navigate(Routes.TOPUP) },
+                onOpenWithdrawal = { navController.navigate(Routes.WITHDRAWAL) },
                 onOpenKyc = { navController.navigate(Routes.KYC) },
                 onOpenCard = { cardId -> navController.navigate(Routes.cardDetail(cardId)) },
                 onOpenHistory = { walletId -> navController.navigate(Routes.history(walletId)) },
@@ -81,7 +83,13 @@ fun NasrCashNavHost(navController: NavHostController = rememberNavController()) 
         }
 
         composable(Routes.TOPUP) {
-            TopupScreenRoute(onDone = { navController.popBackStack() })
+            WalletScopedRoute { walletId -> TopupScreen(walletId = walletId, onDone = { navController.popBackStack() }) }
+        }
+
+        composable(Routes.WITHDRAWAL) {
+            WalletScopedRoute { walletId ->
+                WithdrawalScreen(walletId = walletId, onDone = { navController.popBackStack() })
+            }
         }
 
         composable(Routes.KYC) {
@@ -104,9 +112,9 @@ fun NasrCashNavHost(navController: NavHostController = rememberNavController()) 
     }
 }
 
-/** Resolves the current user's wallet id once, then hands off to [TopupScreen]. */
+/** Resolves the current user's wallet id once, then hands off to [content]. */
 @Composable
-private fun TopupScreenRoute(onDone: () -> Unit) {
+private fun WalletScopedRoute(content: @Composable (walletId: String) -> Unit) {
     val container = (LocalContext.current.applicationContext as NasrCashApplication).container
     var walletId by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -120,7 +128,7 @@ private fun TopupScreenRoute(onDone: () -> Unit) {
 
     when {
         error != null -> ErrorText(error!!)
-        walletId != null -> TopupScreen(walletId = walletId!!, onDone = onDone)
+        walletId != null -> content(walletId!!)
         else -> CircularProgressIndicator(modifier = Modifier.padding(24.dp))
     }
 }

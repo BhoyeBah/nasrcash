@@ -7,6 +7,8 @@ import com.nasrcash.app.core.network.TopupRequest
 import com.nasrcash.app.core.network.TopupResponse
 import com.nasrcash.app.core.network.WalletBalanceResponse
 import com.nasrcash.app.core.network.WalletResponse
+import com.nasrcash.app.core.network.WithdrawalRequest
+import com.nasrcash.app.core.network.WithdrawalResponse
 import com.nasrcash.app.core.network.safeApiCall
 
 class WalletRepository(private val apiService: ApiService) {
@@ -32,4 +34,21 @@ class WalletRepository(private val apiService: ApiService) {
     /** Sandbox-only confirmation, standing in for the provider's webhook. */
     suspend fun simulateTopupSuccess(topupId: String): ApiResult<TopupResponse> =
         safeApiCall { apiService.simulateTopupSuccess(topupId) }
+
+    suspend fun initiateWithdrawal(
+        walletId: String,
+        amount: String,
+        providerName: String,
+    ): ApiResult<WithdrawalResponse> =
+        safeApiCall { apiService.createWithdrawal(walletId, WithdrawalRequest(amount, providerName)) }
+
+    suspend fun listWithdrawals(): ApiResult<List<WithdrawalResponse>> =
+        safeApiCall { apiService.listWithdrawals() }
+
+    suspend fun getWithdrawal(withdrawalId: String): ApiResult<WithdrawalResponse> =
+        safeApiCall { apiService.getWithdrawal(withdrawalId) }
+
+    /** Sandbox-only confirmation, standing in for the provider's payout webhook. */
+    suspend fun simulateWithdrawalSuccess(withdrawalId: String): ApiResult<WithdrawalResponse> =
+        safeApiCall { apiService.simulateWithdrawalSuccess(withdrawalId) }
 }

@@ -81,6 +81,26 @@ data class TopupResponse(
     val created_at: String,
 )
 
+// withdrawals
+
+@Serializable
+data class WithdrawalRequest(val amount: String, val provider_name: String)
+
+@Serializable
+data class WithdrawalResponse(
+    val id: String,
+    val wallet_id: String,
+    val amount: String,
+    val fee_amount: String,
+    val net_amount: String,
+    val currency_code: String,
+    val provider_name: String,
+    val status: String,
+    val failure_reason: String? = null,
+    val confirmed_at: String? = null,
+    val created_at: String,
+)
+
 // KYC
 
 @Serializable
