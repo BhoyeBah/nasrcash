@@ -6,9 +6,15 @@ Résumé de l'écart entre le cahier des charges complet et l'état actuel du d�
 
 ## 1. Vérification de l'app mobile (priorité la plus haute)
 
-L'app Kotlin/Jetpack Compose (`mobile/`) a été écrite entièrement mais **jamais
-compilée** — cet environnement n'a pas de SDK Android, Gradle ni d'émulateur.
-Il faut :
+En revoyant l'app côté fonctionnalités, un vrai trou a été trouvé et corrigé :
+il n'existait aucun écran pour **créer une carte virtuelle** (`issueCard()`
+existait déjà dans le repository/API client mais rien ne l'appelait) — un
+utilisateur KYC2 n'avait aucun moyen d'en créer une depuis l'app. Corrigé sur
+`HomeScreen`/`HomeViewModel`.
+
+L'app Kotlin/Jetpack Compose (`mobile/`) reste cependant **jamais compilée**
+— cet environnement n'a pas de SDK Android, Gradle ni d'émulateur (Gradle est
+présent mais `ANDROID_HOME` ne l'est pas). Il faut :
 
 - Ouvrir le projet dans Android Studio et corriger les erreurs de build de
   premier essai (versions de dépendances, petits écarts d'API).
