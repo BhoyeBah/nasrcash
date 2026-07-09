@@ -19,6 +19,8 @@ from app.modules.admin.schemas import (
     DashboardResponse,
 )
 from app.modules.admin.service import AdminService
+from app.modules.fees.schemas import FeeRuleCreateRequest, FeeRuleResponse
+from app.modules.fees.service import FeeService
 from app.modules.kyc.schemas import KycProfileResponse
 from app.modules.kyc.service import KycService
 from app.modules.limits.schemas import LimitRuleCreateRequest, LimitRuleResponse
@@ -149,6 +151,43 @@ async def deactivate_limit_rule(
     _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
 ):
     service = LimitService(db)
+    rule = await service.deactivate_rule(rule_id)
+    await db.commit()
+    return rule
+
+
+@router.get("/fees", response_model=list[FeeRuleResponse])
+async def list_fee_rules(
+    active_only: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ANY_ADMIN_ROLE)),
+):
+    service = FeeService(db)
+    return await service.list_rules(active_only=active_only)
+
+
+@router.post("/fees", response_model=FeeRuleResponse)
+async def create_fee_rule(
+    payload: FeeRuleCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
+):
+    service = FeeService(db)
+    rule = await service.create_rule(
+        payload.fee_type, payload.country_code, payload.provider_name, payload.kyc_level,
+        payload.rate, payload.fixed_amount,
+    )
+    await db.commit()
+    return rule
+
+
+@router.post("/fees/{rule_id}/deactivate", response_model=FeeRuleResponse)
+async def deactivate_fee_rule(
+    rule_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
+):
+    service = FeeService(db)
     rule = await service.deactivate_rule(rule_id)
     await db.commit()
     return rule

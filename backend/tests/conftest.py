@@ -91,6 +91,16 @@ async def _seed_limit_rules():
     yield
 
 
+@pytest.fixture(autouse=True)
+async def _seed_fee_rules():
+    from app.modules.fees.seed import seed_fee_rules
+
+    async with TestSessionLocal() as session:
+        await seed_fee_rules(session)
+        await session.commit()
+    yield
+
+
 @pytest.fixture
 async def db_session() -> AsyncSession:
     async with TestSessionLocal() as session:

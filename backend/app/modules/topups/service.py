@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
-from app.modules.fees.service import calculate_topup_fee
+from app.modules.fees.service import FeeService
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
 from app.modules.notifications.models import NotificationType
@@ -30,6 +30,7 @@ class TopupService:
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
+        self.fees = FeeService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Topup:
         if amount <= 0:
@@ -44,7 +45,10 @@ class TopupService:
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
 
-        fee = calculate_topup_fee(amount)
+        fee = await self.fees.calculate_topup_fee(
+            amount, country_code=user.country_code, provider_name=provider_name,
+            kyc_level=user.kyc_level,
+        )
         net_amount = amount - fee
 
         result = await provider.initiate_topup(

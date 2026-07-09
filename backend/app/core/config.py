@@ -29,12 +29,6 @@ class Settings(BaseSettings):
     max_login_attempts: int = 5
     login_lockout_minutes: int = 15
 
-    # MVP flat rates; a data-driven fees_rules table (per country/provider/KYC
-    # level) replaces these once the fee catalogue grows past the pilot.
-    topup_fee_percent: str = "0.02"
-    payment_fee_percent: str = "0.03"
-    withdrawal_fee_percent: str = "0.015"
-
     # Bootstrap super_admin created by the seed migration — change immediately
     # in any non-sandbox environment.
     admin_bootstrap_email: str = "admin@nasrcash.com"

@@ -9,7 +9,7 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
 from app.modules.cards.service import card_account_id
-from app.modules.fees.service import calculate_payment_fee
+from app.modules.fees.service import FeeService
 from app.modules.fx.service import FXService
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
@@ -33,6 +33,7 @@ class PaymentService:
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
+        self.fees = FeeService(db)
 
     async def get_payment(self, payment_id: uuid.UUID) -> CardPayment:
         payment = await self.db.get(CardPayment, payment_id)
@@ -120,10 +121,14 @@ class PaymentService:
                 DeclineReason.CARD_BLOCKED.value,
             )
 
+        cardholder = await self.db.get(User, card.user_id)
+
         local_amount, fx_rate = await self.fx.convert(
             merchant_amount, merchant_currency, card.displayed_currency
         )
-        fees_amount = calculate_payment_fee(local_amount)
+        fees_amount = await self.fees.calculate_payment_fee(
+            local_amount, country_code=cardholder.country_code, kyc_level=cardholder.kyc_level,
+        )
         total_debited = local_amount + fees_amount
 
         card_balance = await self.ledger.get_account_balance(
@@ -136,7 +141,6 @@ class PaymentService:
                 fx_rate=fx_rate.rate, local_amount=local_amount, fees_amount=fees_amount,
             )
 
-        cardholder = await self.db.get(User, card.user_id)
         try:
             await self.limits.check_card_payment_daily_cap(cardholder, total_debited)
         except LimitExceededError:

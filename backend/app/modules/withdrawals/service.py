@@ -14,7 +14,7 @@ from app.core.exceptions import (
 )
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
-from app.modules.fees.service import calculate_withdrawal_fee
+from app.modules.fees.service import FeeService
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
 from app.modules.notifications.models import NotificationType
@@ -36,6 +36,7 @@ class WithdrawalService:
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
+        self.fees = FeeService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Withdrawal:
         if amount <= 0:
@@ -55,7 +56,10 @@ class WithdrawalService:
         if wallet_balance < amount:
             raise InsufficientBalanceError("Solde du wallet insuffisant pour ce retrait")
 
-        fee = calculate_withdrawal_fee(amount)
+        fee = await self.fees.calculate_withdrawal_fee(
+            amount, country_code=user.country_code, provider_name=provider_name,
+            kyc_level=user.kyc_level,
+        )
         net_amount = amount - fee
 
         result = await provider.initiate_payout(
