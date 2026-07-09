@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nasrcash.app.core.network.CardResponse
 import com.nasrcash.app.ui.common.ErrorText
+import com.nasrcash.app.ui.common.LoadingButton
 import com.nasrcash.app.ui.common.UiState
 import com.nasrcash.app.ui.common.nasrCashViewModel
 
@@ -46,9 +47,11 @@ fun HomeScreen(
     onOpenNotifications: () -> Unit,
 ) {
     val viewModel = nasrCashViewModel {
-        HomeViewModel(it.walletRepository, it.cardRepository, it.notificationRepository)
+        HomeViewModel(it.walletRepository, it.cardRepository, it.notificationRepository, it.kycRepository)
     }
     val state by viewModel.state.collectAsState()
+    val actionError by viewModel.actionError.collectAsState()
+    val issuingCard by viewModel.issuingCard.collectAsState()
 
     Scaffold(
         topBar = {
@@ -76,11 +79,14 @@ fun HomeScreen(
             is UiState.Success -> HomeContent(
                 data = currentState.data,
                 modifier = Modifier.padding(padding),
+                actionError = actionError,
+                issuingCard = issuingCard,
                 onOpenTopup = onOpenTopup,
                 onOpenWithdrawal = onOpenWithdrawal,
                 onOpenKyc = onOpenKyc,
                 onOpenCard = onOpenCard,
                 onOpenHistory = onOpenHistory,
+                onIssueCard = viewModel::issueCard,
             )
         }
     }
@@ -90,11 +96,14 @@ fun HomeScreen(
 private fun HomeContent(
     data: HomeData,
     modifier: Modifier = Modifier,
+    actionError: String?,
+    issuingCard: Boolean,
     onOpenTopup: () -> Unit,
     onOpenWithdrawal: () -> Unit,
     onOpenKyc: () -> Unit,
     onOpenCard: (String) -> Unit,
     onOpenHistory: (String) -> Unit,
+    onIssueCard: () -> Unit,
 ) {
     LazyColumn(modifier = modifier.fillMaxSize().padding(16.dp)) {
         item {
@@ -129,24 +138,40 @@ private fun HomeContent(
         }
 
         item {
-            Text(
-                "Mes cartes virtuelles",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Mes cartes virtuelles", style = MaterialTheme.typography.titleMedium)
+                if (data.cards.isNotEmpty() && data.currentKycLevel >= 2) {
+                    LoadingButton(text = "+ Nouvelle carte", isLoading = issuingCard, onClick = onIssueCard)
+                }
+            }
         }
+
+        actionError?.let { item { ErrorText(it, Modifier.padding(bottom = 8.dp)) } }
 
         if (data.cards.isEmpty()) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Vous n'avez pas encore de carte virtuelle.")
-                        Text(
-                            "Un niveau KYC 2 est requis pour en créer une.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Button(onClick = onOpenKyc, modifier = Modifier.padding(top = 12.dp)) {
-                            Text("Compléter mon KYC")
+                        if (data.currentKycLevel >= 2) {
+                            LoadingButton(
+                                text = "Créer une carte",
+                                isLoading = issuingCard,
+                                onClick = onIssueCard,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        } else {
+                            Text(
+                                "Un niveau KYC 2 est requis pour en créer une.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Button(onClick = onOpenKyc, modifier = Modifier.padding(top = 12.dp)) {
+                                Text("Compléter mon KYC")
+                            }
                         }
                     }
                 }
