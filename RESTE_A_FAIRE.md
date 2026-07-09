@@ -30,24 +30,30 @@ Manquent les écrans pour :
   alimentée par tout le backend, mais rien ne l'affiche.
 - Export comptable.
 
-## 3. Modules "frais" et "limites" simplifiés
+## 3. Modules "frais" et "limites" — ✅ fait
 
-- **Frais** : taux fixes (`TOPUP_FEE_PERCENT`, `PAYMENT_FEE_PERCENT`,
-  `WITHDRAWAL_FEE_PERCENT`) définis en configuration, pas la table
-  `fees_rules` configurable par pays / provider / niveau KYC décrite dans le
-  cahier (section 14.8).
-- **Limites** : aucun plafond n'est appliqué (recharge min/max, plafond
-  journalier/mensuel, nombre de cartes, etc. — section 14.9). Un utilisateur
-  peut aujourd'hui recharger ou retirer un montant illimité.
+- **Frais** : table `fee_rules` configurable par pays / provider / niveau KYC
+  (section 14.8), avec endpoints admin CRUD (`/admin/fees`). Les anciens taux
+  fixes (`TOPUP_FEE_PERCENT`, etc.) ont été supprimés de la config.
+- **Limites** : table `limit_rules` configurable par pays / niveau KYC
+  (section 14.9) — recharge min/max, plafond glissant 24h (recharge, retrait,
+  paiement carte), nombre max de cartes. Endpoints admin CRUD (`/admin/limits`).
+  Un dépassement décline le paiement carte ou rejette la recharge/retrait/
+  émission de carte avec `422 limit_exceeded`.
 
-## 4. Conformité et risque
+## 4. Conformité et risque — ✅ fait (détection de base)
 
-Aucune des fonctionnalités de la section 15.6 / 14.9 n'existe :
+Implémenté (`app/modules/compliance/`) :
 
-- Pas d'alertes AML, pas de détection de comportements suspects.
-- Pas de scoring de risque par utilisateur.
-- Pas de gel de compte automatique.
-- Pas de rapport d'activité conformité.
+- Alertes automatiques : transaction importante (`large_transaction`, seuil
+  configurable), vélocité (`velocity`, N transactions en fenêtre glissante),
+  tentative de dépassement de plafond (`limit_exceeded_attempt`, déclenchée
+  depuis les recharges/retraits/paiements carte/émission de carte).
+- Endpoints admin : lister (`GET /admin/compliance/alerts`, filtrable par
+  statut/sévérité/utilisateur), résoudre et rejeter une alerte, gated aux
+  rôles compliance/risk/audit.
+- Pas encore fait : scoring de risque agrégé par utilisateur, gel de compte
+  automatique, rapport d'activité conformité exportable (section 15.6).
 
 ## 5. Notifications push
 
@@ -87,11 +93,11 @@ ultérieures du cahier (section 24, Phase 3+) :
 
 | Domaine | État |
 |---|---|
-| Backend | ✅ 90 tests passants, tous les blocs 1-12 + retrait |
-| Admin Next.js | ✅ Vérifié en live, mais couverture fonctionnelle partielle |
+| Backend | ✅ 112 tests passants, tous les blocs 1-12 + retrait + frais/limites + conformité |
+| Admin Next.js | ✅ Vérifié en live, mais couverture fonctionnelle partielle (pas encore d'écran frais/limites/conformité) |
 | Mobile Kotlin | ⚠️ Écrit, jamais compilé/testé |
-| Frais/Limites configurables | ❌ Simplifié (taux fixes, aucun plafond) |
-| Conformité/Risque | ❌ Non commencé |
+| Frais/Limites configurables | ✅ Fait (`fee_rules`/`limit_rules`, CRUD admin) |
+| Conformité/Risque | ✅ Détection de base faite (alertes), scoring/gel de compte restants |
 | Push notifications | ❌ Non fait (optionnel) |
 | CI/CD, observabilité | ❌ Non fait |
 | Intégrations réelles (providers) | ❌ Hors scope MVP sandbox |

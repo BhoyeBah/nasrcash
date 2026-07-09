@@ -22,3 +22,4 @@ def import_all_models() -> None:
     from app.modules.admin import models as admin_models  # noqa: F401
     from app.modules.limits import models as limits_models  # noqa: F401
     from app.modules.fees import models as fees_models  # noqa: F401
+    from app.modules.compliance import models as compliance_models  # noqa: F401

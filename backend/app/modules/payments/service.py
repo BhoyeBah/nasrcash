@@ -9,6 +9,7 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
 from app.modules.cards.service import card_account_id
+from app.modules.compliance.service import ComplianceService
 from app.modules.fees.service import FeeService
 from app.modules.fx.service import FXService
 from app.modules.ledger.service import LedgerService
@@ -34,6 +35,7 @@ class PaymentService:
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
         self.fees = FeeService(db)
+        self.compliance = ComplianceService(db)
 
     async def get_payment(self, payment_id: uuid.UUID) -> CardPayment:
         payment = await self.db.get(CardPayment, payment_id)
@@ -144,6 +146,9 @@ class PaymentService:
         try:
             await self.limits.check_card_payment_daily_cap(cardholder, total_debited)
         except LimitExceededError:
+            await self.compliance.record_limit_breach(
+                cardholder.id, "card_payment", {"total_debited": str(total_debited)}
+            )
             return await self._decline(
                 card, merchant_name, merchant_amount, merchant_currency, provider_reference,
                 DeclineReason.LIMIT_EXCEEDED.value,
@@ -202,6 +207,8 @@ class PaymentService:
             f"Paiement de {merchant_amount} {merchant_currency} chez {merchant_name} accepté "
             f"— {total_debited} {card.displayed_currency} débités.",
         )
+        await self.compliance.check_large_transaction(card.user_id, total_debited, "card_payment")
+        await self.compliance.check_velocity(card.user_id, "card_payment")
         return payment
 
     async def simulate_decline(

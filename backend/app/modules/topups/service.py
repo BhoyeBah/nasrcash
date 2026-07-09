@@ -5,9 +5,16 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    LimitExceededError,
+    NotFoundError,
+    ValidationError,
+)
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
+from app.modules.compliance.service import ComplianceService
 from app.modules.fees.service import FeeService
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
@@ -31,6 +38,7 @@ class TopupService:
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
         self.fees = FeeService(db)
+        self.compliance = ComplianceService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Topup:
         if amount <= 0:
@@ -40,8 +48,14 @@ class TopupService:
         if provider is None:
             raise ValidationError(f"Moyen de recharge non supporté : {provider_name}")
 
-        await self.limits.check_topup_amount(user, amount)
-        await self.limits.check_wallet_daily_topup_cap(user, amount)
+        try:
+            await self.limits.check_topup_amount(user, amount)
+            await self.limits.check_wallet_daily_topup_cap(user, amount)
+        except LimitExceededError:
+            await self.compliance.record_limit_breach(
+                user.id, "topup", {"amount": str(amount)}
+            )
+            raise
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
 
@@ -128,6 +142,8 @@ class TopupService:
             actor_type="system", action="topup.success", target_type="topup",
             target_id=str(topup.id),
         )
+        await self.compliance.check_large_transaction(topup.user_id, topup.amount, "topup")
+        await self.compliance.check_velocity(topup.user_id, "topup")
         await self.notifications.create(
             topup.user_id, NotificationType.TOPUP_RECEIVED.value,
             "Recharge reçue",

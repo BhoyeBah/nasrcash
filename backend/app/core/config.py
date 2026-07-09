@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     admin_bootstrap_email: str = "admin@nasrcash.com"
     admin_bootstrap_password: str = "ChangeMe123!"
 
+    # Compliance/risk detection thresholds (not per-country/KYC scoped like
+    # fees and limits — these are fraud-monitoring heuristics, not pricing).
+    compliance_large_transaction_threshold: int = 3_000_000
+    compliance_velocity_window_minutes: int = 10
+    compliance_velocity_max_count: int = 5
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"

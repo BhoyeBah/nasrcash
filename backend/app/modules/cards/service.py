@@ -8,12 +8,14 @@ from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
     InsufficientBalanceError,
+    LimitExceededError,
     NotFoundError,
     ValidationError,
 )
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
+from app.modules.compliance.service import ComplianceService
 from app.modules.ledger.models import LedgerEntry
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
@@ -37,6 +39,7 @@ class CardService:
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
+        self.compliance = ComplianceService(db)
         self.provider = get_card_provider()
 
     async def issue_card(self, user: User) -> Card:
@@ -44,7 +47,11 @@ class CardService:
             raise ForbiddenError(
                 f"Niveau KYC {REQUIRED_KYC_LEVEL_FOR_CARD} requis pour créer une carte"
             )
-        await self.limits.check_max_cards(user)
+        try:
+            await self.limits.check_max_cards(user)
+        except LimitExceededError:
+            await self.compliance.record_limit_breach(user.id, "max_cards_per_user", {})
+            raise
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
         result = await self.provider.create_card(user.id, wallet.currency_code)

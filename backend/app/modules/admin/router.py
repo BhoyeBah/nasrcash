@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.permissions import FEES_LIMITS_WRITE_ROLES, KYC_REVIEWER_ROLES, AdminRole
+from app.core.permissions import (
+    COMPLIANCE_RESOLVE_ROLES,
+    COMPLIANCE_VIEW_ROLES,
+    FEES_LIMITS_WRITE_ROLES,
+    KYC_REVIEWER_ROLES,
+    AdminRole,
+)
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_admin_access_token
 from app.modules.admin.dependencies import require_admin_roles
@@ -19,6 +25,8 @@ from app.modules.admin.schemas import (
     DashboardResponse,
 )
 from app.modules.admin.service import AdminService
+from app.modules.compliance.schemas import ComplianceAlertResolveRequest, ComplianceAlertResponse
+from app.modules.compliance.service import ComplianceService
 from app.modules.fees.schemas import FeeRuleCreateRequest, FeeRuleResponse
 from app.modules.fees.service import FeeService
 from app.modules.kyc.schemas import KycProfileResponse
@@ -191,3 +199,41 @@ async def deactivate_fee_rule(
     rule = await service.deactivate_rule(rule_id)
     await db.commit()
     return rule
+
+
+@router.get("/compliance/alerts", response_model=list[ComplianceAlertResponse])
+async def list_compliance_alerts(
+    status: str | None = Query(None),
+    severity: str | None = Query(None),
+    user_id: uuid.UUID | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(COMPLIANCE_VIEW_ROLES)),
+):
+    service = ComplianceService(db)
+    return await service.list_alerts(status=status, severity=severity, user_id=user_id)
+
+
+@router.post("/compliance/alerts/{alert_id}/resolve", response_model=ComplianceAlertResponse)
+async def resolve_compliance_alert(
+    alert_id: uuid.UUID,
+    payload: ComplianceAlertResolveRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(COMPLIANCE_RESOLVE_ROLES)),
+):
+    service = ComplianceService(db)
+    alert = await service.resolve_alert(alert_id, admin.id, payload.resolution_notes)
+    await db.commit()
+    return alert
+
+
+@router.post("/compliance/alerts/{alert_id}/dismiss", response_model=ComplianceAlertResponse)
+async def dismiss_compliance_alert(
+    alert_id: uuid.UUID,
+    payload: ComplianceAlertResolveRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(COMPLIANCE_RESOLVE_ROLES)),
+):
+    service = ComplianceService(db)
+    alert = await service.dismiss_alert(alert_id, admin.id, payload.resolution_notes)
+    await db.commit()
+    return alert

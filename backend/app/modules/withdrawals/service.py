@@ -9,11 +9,13 @@ from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
     InsufficientBalanceError,
+    LimitExceededError,
     NotFoundError,
     ValidationError,
 )
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
+from app.modules.compliance.service import ComplianceService
 from app.modules.fees.service import FeeService
 from app.modules.ledger.service import LedgerService
 from app.modules.limits.service import LimitService
@@ -37,6 +39,7 @@ class WithdrawalService:
         self.notifications = NotificationService(db)
         self.limits = LimitService(db)
         self.fees = FeeService(db)
+        self.compliance = ComplianceService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Withdrawal:
         if amount <= 0:
@@ -46,7 +49,13 @@ class WithdrawalService:
         if provider is None:
             raise ValidationError(f"Moyen de retrait non supporté : {provider_name}")
 
-        await self.limits.check_withdrawal_daily_cap(user, amount)
+        try:
+            await self.limits.check_withdrawal_daily_cap(user, amount)
+        except LimitExceededError:
+            await self.compliance.record_limit_breach(
+                user.id, "withdrawal", {"amount": str(amount)}
+            )
+            raise
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
 
@@ -152,6 +161,10 @@ class WithdrawalService:
             actor_type="system", action="withdrawal.success", target_type="withdrawal",
             target_id=str(withdrawal.id),
         )
+        await self.compliance.check_large_transaction(
+            withdrawal.user_id, withdrawal.amount, "withdrawal"
+        )
+        await self.compliance.check_velocity(withdrawal.user_id, "withdrawal")
         await self.notifications.create(
             withdrawal.user_id, NotificationType.WITHDRAWAL_SUCCESSFUL.value,
             "Retrait effectué",
