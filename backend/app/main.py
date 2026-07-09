@@ -10,6 +10,7 @@ from app.modules.cards.router import router as cards_router
 from app.modules.sandbox.router import router as sandbox_router
 from app.modules.topups.router import router as topups_router
 from app.modules.wallets.router import router as wallets_router
+from app.modules.withdrawals.router import router as withdrawals_router
 
 settings = get_settings()
 
@@ -25,6 +26,7 @@ app.include_router(auth_router)
 app.include_router(kyc_router)
 app.include_router(wallets_router)
 app.include_router(topups_router)
+app.include_router(withdrawals_router)
 app.include_router(cards_router)
 app.include_router(notifications_router)
 app.include_router(admin_router)

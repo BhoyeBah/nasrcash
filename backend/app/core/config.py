@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # level) replaces these once the fee catalogue grows past the pilot.
     topup_fee_percent: str = "0.02"
     payment_fee_percent: str = "0.03"
+    withdrawal_fee_percent: str = "0.015"
 
     # Bootstrap super_admin created by the seed migration — change immediately
     # in any non-sandbox environment.

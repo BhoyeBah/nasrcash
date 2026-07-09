@@ -14,6 +14,7 @@ def import_all_models() -> None:
     from app.modules.ledger import models as ledger_models  # noqa: F401
     from app.modules.wallets import models as wallets_models  # noqa: F401
     from app.modules.topups import models as topups_models  # noqa: F401
+    from app.modules.withdrawals import models as withdrawals_models  # noqa: F401
     from app.modules.cards import models as cards_models  # noqa: F401
     from app.modules.fx import models as fx_models  # noqa: F401
     from app.modules.payments import models as payments_models  # noqa: F401

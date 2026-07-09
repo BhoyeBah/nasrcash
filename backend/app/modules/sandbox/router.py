@@ -18,6 +18,8 @@ from app.modules.sandbox.dependencies import require_sandbox_mode
 from app.modules.sandbox.schemas import SimulateFailureRequest, SimulateRefundRequest
 from app.modules.topups.schemas import TopupResponse
 from app.modules.topups.service import TopupService
+from app.modules.withdrawals.schemas import WithdrawalResponse
+from app.modules.withdrawals.service import WithdrawalService
 
 router = APIRouter(
     prefix="/api/v1/sandbox", tags=["sandbox"], dependencies=[Depends(require_sandbox_mode)]
@@ -49,6 +51,26 @@ async def simulate_topup_failure(
     topup = await service.simulate_failure(topup_id, payload.reason)
     await db.commit()
     return topup
+
+
+@router.post("/withdrawals/{withdrawal_id}/simulate-success", response_model=WithdrawalResponse)
+async def simulate_withdrawal_success(withdrawal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    service = WithdrawalService(db)
+    withdrawal = await service.simulate_success(withdrawal_id)
+    await db.commit()
+    return withdrawal
+
+
+@router.post("/withdrawals/{withdrawal_id}/simulate-failure", response_model=WithdrawalResponse)
+async def simulate_withdrawal_failure(
+    withdrawal_id: uuid.UUID,
+    payload: SimulateFailureRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    service = WithdrawalService(db)
+    withdrawal = await service.simulate_failure(withdrawal_id, payload.reason)
+    await db.commit()
+    return withdrawal
 
 
 @router.post("/cards/{card_id}/simulate-payment", response_model=CardPaymentResponse)

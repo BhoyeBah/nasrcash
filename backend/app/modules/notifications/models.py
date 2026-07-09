@@ -15,6 +15,8 @@ class NotificationType(StrEnum):
     KYC_APPROVED = "kyc_approved"
     KYC_REJECTED = "kyc_rejected"
     TOPUP_RECEIVED = "topup_received"
+    WITHDRAWAL_SUCCESSFUL = "withdrawal_successful"
+    WITHDRAWAL_FAILED = "withdrawal_failed"
     CARD_CREATED = "card_created"
     CARD_FUNDED = "card_funded"
     PAYMENT_ACCEPTED = "payment_accepted"
