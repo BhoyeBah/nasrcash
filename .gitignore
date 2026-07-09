@@ -1,0 +1,3 @@
+# Redis persistence dump created by local `redis-server` runs during dev/testing,
+# regardless of which directory it was launched from.
+dump.rdb
