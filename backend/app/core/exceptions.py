@@ -50,6 +50,15 @@ class RateLimitError(NasrCashError):
     error_code = "rate_limited"
 
 
+class LimitExceededError(NasrCashError):
+    """A business limit (plafond) would be exceeded by this operation —
+    distinct from RateLimitError, which is about request frequency, not
+    money amounts or counts."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    error_code = "limit_exceeded"
+
+
 class LedgerImbalanceError(NasrCashError):
     """Raised when a ledger transaction's debits and credits do not balance.
 

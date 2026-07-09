@@ -4,13 +4,15 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, ForbiddenError, LimitExceededError, NotFoundError, ValidationError
 from app.modules.audit.service import AuditService
+from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
 from app.modules.cards.service import card_account_id
 from app.modules.fees.service import calculate_payment_fee
 from app.modules.fx.service import FXService
 from app.modules.ledger.service import LedgerService
+from app.modules.limits.service import LimitService
 from app.modules.notifications.models import NotificationType
 from app.modules.notifications.service import NotificationService
 from app.modules.payments.models import CardPayment, DeclineReason, PaymentStatus
@@ -30,6 +32,7 @@ class PaymentService:
         self.fx = FXService(db)
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
+        self.limits = LimitService(db)
 
     async def get_payment(self, payment_id: uuid.UUID) -> CardPayment:
         payment = await self.db.get(CardPayment, payment_id)
@@ -130,6 +133,16 @@ class PaymentService:
             return await self._decline(
                 card, merchant_name, merchant_amount, merchant_currency, provider_reference,
                 DeclineReason.INSUFFICIENT_BALANCE.value,
+                fx_rate=fx_rate.rate, local_amount=local_amount, fees_amount=fees_amount,
+            )
+
+        cardholder = await self.db.get(User, card.user_id)
+        try:
+            await self.limits.check_card_payment_daily_cap(cardholder, total_debited)
+        except LimitExceededError:
+            return await self._decline(
+                card, merchant_name, merchant_amount, merchant_currency, provider_reference,
+                DeclineReason.LIMIT_EXCEEDED.value,
                 fx_rate=fx_rate.rate, local_amount=local_amount, fees_amount=fees_amount,
             )
 

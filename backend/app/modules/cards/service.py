@@ -16,6 +16,7 @@ from app.modules.auth.models import User
 from app.modules.cards.models import Card, CardStatus
 from app.modules.ledger.models import LedgerEntry
 from app.modules.ledger.service import LedgerService
+from app.modules.limits.service import LimitService
 from app.modules.notifications.models import NotificationType
 from app.modules.notifications.service import NotificationService
 from app.modules.providers.registry import get_card_provider
@@ -35,6 +36,7 @@ class CardService:
         self.wallets = WalletService(db)
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
+        self.limits = LimitService(db)
         self.provider = get_card_provider()
 
     async def issue_card(self, user: User) -> Card:
@@ -42,6 +44,7 @@ class CardService:
             raise ForbiddenError(
                 f"Niveau KYC {REQUIRED_KYC_LEVEL_FOR_CARD} requis pour créer une carte"
             )
+        await self.limits.check_max_cards(user)
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
         result = await self.provider.create_card(user.id, wallet.currency_code)

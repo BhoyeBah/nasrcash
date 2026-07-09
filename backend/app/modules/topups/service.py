@@ -10,6 +10,7 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.models import User
 from app.modules.fees.service import calculate_topup_fee
 from app.modules.ledger.service import LedgerService
+from app.modules.limits.service import LimitService
 from app.modules.notifications.models import NotificationType
 from app.modules.notifications.service import NotificationService
 from app.modules.providers.registry import get_payment_provider
@@ -28,6 +29,7 @@ class TopupService:
         self.wallets = WalletService(db)
         self.audit = AuditService(db)
         self.notifications = NotificationService(db)
+        self.limits = LimitService(db)
 
     async def initiate(self, user: User, amount: Decimal, provider_name: str) -> Topup:
         if amount <= 0:
@@ -36,6 +38,9 @@ class TopupService:
         provider = get_payment_provider(provider_name)
         if provider is None:
             raise ValidationError(f"Moyen de recharge non supporté : {provider_name}")
+
+        await self.limits.check_topup_amount(user, amount)
+        await self.limits.check_wallet_daily_topup_cap(user, amount)
 
         wallet = await self.wallets.get_wallet_for_user(user.id)
 

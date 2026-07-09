@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.permissions import KYC_REVIEWER_ROLES, AdminRole
+from app.core.permissions import FEES_LIMITS_WRITE_ROLES, KYC_REVIEWER_ROLES, AdminRole
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_admin_access_token
 from app.modules.admin.dependencies import require_admin_roles
@@ -21,6 +21,8 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import AdminService
 from app.modules.kyc.schemas import KycProfileResponse
 from app.modules.kyc.service import KycService
+from app.modules.limits.schemas import LimitRuleCreateRequest, LimitRuleResponse
+from app.modules.limits.service import LimitService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -113,3 +115,40 @@ async def reject_kyc(
     profile = await service.reject(profile_id, reviewer_id=str(admin.id), reason=payload.reason)
     await db.commit()
     return profile
+
+
+@router.get("/limits", response_model=list[LimitRuleResponse])
+async def list_limit_rules(
+    active_only: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ANY_ADMIN_ROLE)),
+):
+    service = LimitService(db)
+    return await service.list_rules(active_only=active_only)
+
+
+@router.post("/limits", response_model=LimitRuleResponse)
+async def create_limit_rule(
+    payload: LimitRuleCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
+):
+    service = LimitService(db)
+    rule = await service.create_rule(
+        payload.limit_type, payload.country_code, payload.kyc_level,
+        payload.max_amount, payload.max_count,
+    )
+    await db.commit()
+    return rule
+
+
+@router.post("/limits/{rule_id}/deactivate", response_model=LimitRuleResponse)
+async def deactivate_limit_rule(
+    rule_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
+):
+    service = LimitService(db)
+    rule = await service.deactivate_rule(rule_id)
+    await db.commit()
+    return rule

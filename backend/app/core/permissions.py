@@ -31,6 +31,27 @@ KYC_REVIEWER_ROLES = {
 # Roles allowed to view the admin dashboard and transaction data.
 DASHBOARD_VIEWER_ROLES = set(AdminRole)
 
+# Roles allowed to create/update fee and limit rules — a pricing/risk lever,
+# not something support or auditors should be able to touch.
+FEES_LIMITS_WRITE_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.FINANCE_MANAGER,
+}
+
+# Roles allowed to see compliance alerts.
+COMPLIANCE_VIEW_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.COMPLIANCE_OFFICER,
+    AdminRole.RISK_ANALYST,
+    AdminRole.AUDITOR,
+}
+
+# Roles allowed to resolve/dismiss compliance alerts (a compliance decision).
+COMPLIANCE_RESOLVE_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.COMPLIANCE_OFFICER,
+}
+
 
 def require_role(role: AdminRole, allowed: set[AdminRole]) -> None:
     if role not in allowed:

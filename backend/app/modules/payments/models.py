@@ -20,6 +20,7 @@ class DeclineReason(StrEnum):
     CARD_FROZEN = "card_frozen"
     CARD_BLOCKED = "card_blocked"
     UNSUPPORTED_CURRENCY = "unsupported_currency"
+    LIMIT_EXCEEDED = "limit_exceeded"
 
 
 class CardPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
