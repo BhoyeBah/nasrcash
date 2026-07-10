@@ -118,6 +118,22 @@ interface ApiService {
     @GET("api/v1/cards/{cardId}/payments")
     suspend fun getCardPayments(@Path("cardId") cardId: String): List<CardPaymentResponse>
 
+    // --- support ---
+    @POST("api/v1/support/tickets")
+    suspend fun createTicket(@Body body: TicketCreateRequest): TicketResponse
+
+    @GET("api/v1/support/tickets")
+    suspend fun listTickets(): List<TicketResponse>
+
+    @GET("api/v1/support/tickets/{ticketId}")
+    suspend fun getTicket(@Path("ticketId") ticketId: String): TicketDetailResponse
+
+    @POST("api/v1/support/tickets/{ticketId}/messages")
+    suspend fun addTicketMessage(
+        @Path("ticketId") ticketId: String,
+        @Body body: MessageCreateRequest,
+    ): MessageResponse
+
     // --- notifications ---
     @GET("api/v1/notifications")
     suspend fun listNotifications(@Query("unread_only") unreadOnly: Boolean = false): List<NotificationResponse>

@@ -162,6 +162,37 @@ data class CardPaymentResponse(
     val created_at: String,
 )
 
+// support
+
+@Serializable
+data class TicketCreateRequest(val subject: String, val category: String, val message: String)
+
+@Serializable
+data class MessageCreateRequest(val body: String)
+
+@Serializable
+data class TicketResponse(
+    val id: String,
+    val user_id: String,
+    val subject: String,
+    val category: String,
+    val status: String,
+    val created_at: String,
+)
+
+@Serializable
+data class MessageResponse(
+    val id: String,
+    val ticket_id: String,
+    val sender_type: String,
+    val sender_id: String,
+    val body: String,
+    val created_at: String,
+)
+
+@Serializable
+data class TicketDetailResponse(val ticket: TicketResponse, val messages: List<MessageResponse>)
+
 // notifications
 
 @Serializable

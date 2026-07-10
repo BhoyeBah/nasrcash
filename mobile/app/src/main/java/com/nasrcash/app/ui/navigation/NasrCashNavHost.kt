@@ -28,6 +28,8 @@ import com.nasrcash.app.ui.kyc.KycScreen
 import com.nasrcash.app.ui.notifications.NotificationsScreen
 import com.nasrcash.app.ui.onboarding.OtpScreen
 import com.nasrcash.app.ui.onboarding.RegisterScreen
+import com.nasrcash.app.ui.support.SupportDetailScreen
+import com.nasrcash.app.ui.support.SupportListScreen
 import com.nasrcash.app.ui.topup.TopupScreen
 import com.nasrcash.app.ui.withdrawal.WithdrawalScreen
 
@@ -79,6 +81,7 @@ fun NasrCashNavHost(navController: NavHostController = rememberNavController()) 
                 onOpenCard = { cardId -> navController.navigate(Routes.cardDetail(cardId)) },
                 onOpenHistory = { walletId -> navController.navigate(Routes.history(walletId)) },
                 onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
+                onOpenSupport = { navController.navigate(Routes.SUPPORT) },
             )
         }
 
@@ -108,6 +111,15 @@ fun NasrCashNavHost(navController: NavHostController = rememberNavController()) 
 
         composable(Routes.NOTIFICATIONS) {
             NotificationsScreen()
+        }
+
+        composable(Routes.SUPPORT) {
+            SupportListScreen(onOpenTicket = { ticketId -> navController.navigate(Routes.supportDetail(ticketId)) })
+        }
+
+        composable(Routes.SUPPORT_DETAIL) { backStackEntry ->
+            val ticketId = backStackEntry.arguments?.getString("ticketId").orEmpty()
+            SupportDetailScreen(ticketId = ticketId)
         }
     }
 }

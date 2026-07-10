@@ -8,6 +8,7 @@ import com.nasrcash.app.data.repository.AuthRepository
 import com.nasrcash.app.data.repository.CardRepository
 import com.nasrcash.app.data.repository.KycRepository
 import com.nasrcash.app.data.repository.NotificationRepository
+import com.nasrcash.app.data.repository.SupportRepository
 import com.nasrcash.app.data.repository.WalletRepository
 
 /**
@@ -26,6 +27,7 @@ class AppContainer(context: Context) {
     val cardRepository = CardRepository(apiService)
     val kycRepository = KycRepository(apiService)
     val notificationRepository = NotificationRepository(apiService, database.notificationDao())
+    val supportRepository = SupportRepository(apiService)
 
     val isLoggedIn get() = authRepository.isLoggedIn
 }

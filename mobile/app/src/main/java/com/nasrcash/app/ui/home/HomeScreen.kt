@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -45,6 +46,7 @@ fun HomeScreen(
     onOpenCard: (String) -> Unit,
     onOpenHistory: (String) -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenSupport: () -> Unit,
 ) {
     val viewModel = nasrCashViewModel {
         HomeViewModel(it.walletRepository, it.cardRepository, it.notificationRepository, it.kycRepository)
@@ -58,6 +60,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("NasrCash") },
                 actions = {
+                    IconButton(onClick = onOpenSupport) {
+                        Icon(Icons.Filled.Info, contentDescription = "Support")
+                    }
                     val unread = (state as? UiState.Success)?.data?.unreadNotifications ?: 0
                     IconButton(onClick = onOpenNotifications) {
                         BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {

@@ -11,10 +11,13 @@ object Routes {
     const val CARD_DETAIL = "card/{cardId}"
     const val HISTORY = "history/{walletId}"
     const val NOTIFICATIONS = "notifications"
+    const val SUPPORT = "support"
+    const val SUPPORT_DETAIL = "support/{ticketId}"
 
     fun otp(phone: String) = "otp/${Uri.encode(phone)}"
     fun cardDetail(cardId: String) = "card/$cardId"
     fun history(walletId: String) = "history/$walletId"
+    fun supportDetail(ticketId: String) = "support/$ticketId"
 }
 
 // Minimal encode helper to avoid pulling in android.net.Uri in a non-Android-context file.

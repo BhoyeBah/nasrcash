@@ -4,37 +4,38 @@ Résumé de l'écart entre le cahier des charges complet et l'état actuel du d�
 (`backend/`, `admin/`, `mobile/`). Voir `CAHIER_DES_CHARGES_NASRCASH.md` et
 `NASRCASH_TECH_SPEC.md` pour la spécification complète.
 
-## 1. Vérification de l'app mobile (priorité la plus haute)
+## 1. Vérification de l'app mobile
 
 En revoyant l'app côté fonctionnalités, un vrai trou a été trouvé et corrigé :
 il n'existait aucun écran pour **créer une carte virtuelle** (`issueCard()`
 existait déjà dans le repository/API client mais rien ne l'appelait) — un
 utilisateur KYC2 n'avait aucun moyen d'en créer une depuis l'app. Corrigé sur
-`HomeScreen`/`HomeViewModel`.
+`HomeScreen`/`HomeViewModel`. Un module **support client** (créer un ticket,
+lister ses tickets, fil de discussion + réponse) a aussi été ajouté.
 
 L'app Kotlin/Jetpack Compose (`mobile/`) reste cependant **jamais compilée**
-— cet environnement n'a pas de SDK Android, Gradle ni d'émulateur (Gradle est
-présent mais `ANDROID_HOME` ne l'est pas). Il faut :
+— cet environnement n'a pas de SDK Android ni d'émulateur (Gradle est présent
+mais `ANDROID_HOME` ne l'est pas). Il faut :
 
 - Ouvrir le projet dans Android Studio et corriger les erreurs de build de
   premier essai (versions de dépendances, petits écarts d'API).
 - Tester le parcours complet sur émulateur : inscription → OTP → KYC →
-  carte → paiement → retrait.
+  carte → paiement → retrait → support.
 - Ajouter des tests instrumentés/unitaires côté mobile (aucun n'existe).
 
-## 2. Back-office admin incomplet
+## 2. Back-office admin — ✅ fait
 
-Seules les actions en lecture (+ KYC approuver/rejeter) sont dans `admin/`.
-Manquent les écrans pour :
-
-- Gérer les cartes (bloquer/débloquer depuis l'admin).
-- Gérer les taux de change et les frais (un endpoint sandbox existe déjà
-  côté backend — `POST /sandbox/fx/update-rate` — mais aucune page admin).
-- Gérer les plafonds (aucun plafond n'existe encore, voir point 3).
-- Gérer les rôles/permissions des comptes admin.
-- Consulter le journal d'audit (`audit_logs`) — la table existe et est déjà
-  alimentée par tout le backend, mais rien ne l'affiche.
-- Export comptable.
+Écrans ajoutés dans `admin/` (en plus des écrans lecture + KYC déjà en place) :
+cartes (bloquer/débloquer), taux de change (historique + création — remplace
+l'endpoint sandbox-only), plafonds et frais (CRUD), conformité/risque (alertes,
+score de risque, débloquer un compte, export CSV), support client (liste +
+fil de discussion), journal d'audit (filtrable), export comptable CSV, et
+gestion des comptes admin (créer/changer de rôle/désactiver — super_admin
+uniquement). Vérifié en direct dans un vrai navigateur contre le backend
+(voir historique de commit) : blocage/déblocage de carte, création de taux
+FX, désactivation de règle, réponse à un ticket, création de compte admin,
+et résolution d'alerte avec consultation du score de risque fonctionnent
+de bout en bout.
 
 ## 3. Modules "frais" et "limites" — ✅ fait
 
@@ -47,39 +48,52 @@ Manquent les écrans pour :
   Un dépassement décline le paiement carte ou rejette la recharge/retrait/
   émission de carte avec `422 limit_exceeded`.
 
-## 4. Conformité et risque — ✅ fait (détection de base)
+## 4. Conformité et risque — ✅ fait
 
 Implémenté (`app/modules/compliance/`) :
 
 - Alertes automatiques : transaction importante (`large_transaction`, seuil
-  configurable), vélocité (`velocity`, N transactions en fenêtre glissante),
-  tentative de dépassement de plafond (`limit_exceeded_attempt`, déclenchée
-  depuis les recharges/retraits/paiements carte/émission de carte).
-- Endpoints admin : lister (`GET /admin/compliance/alerts`, filtrable par
-  statut/sévérité/utilisateur), résoudre et rejeter une alerte, gated aux
-  rôles compliance/risk/audit.
-- Pas encore fait : scoring de risque agrégé par utilisateur, gel de compte
-  automatique, rapport d'activité conformité exportable (section 15.6).
+  configurable, sévérité jusqu'à `critical` au-delà de 10x le seuil),
+  vélocité (`velocity`), tentative de dépassement de plafond
+  (`limit_exceeded_attempt`).
+- Score de risque agrégé par utilisateur (somme pondérée des alertes
+  ouvertes sur une fenêtre glissante) et **gel de compte automatique**
+  (compte suspendu + wallet bloqué) quand le score dépasse un seuil
+  configurable — un compte gelé est rejeté partout via `get_current_user`,
+  et un paiement carte décline avec `account_frozen`.
+  Déblocage manuel par un admin conformité.
+- Rapport d'activité conformité exportable en CSV.
+- Endpoints admin : lister/résoudre/rejeter une alerte, score de risque,
+  débloquer un compte, export — gated aux rôles compliance/risk/audit.
 
-## 5. Notifications push
+## 5. Support client — ✅ fait (canal in-app uniquement)
 
-Seules les notifications in-app (table `notifications`, `GET /notifications`)
-existent. FCM/OneSignal n'est pas intégré — explicitement marqué optionnel
-dans le cahier ("seulement si le temps le permet").
+Nouveau module (`app/modules/support/`) : un utilisateur crée un ticket et y
+répond ; un admin liste/répond/résout/ferme les tickets, avec notification
+in-app au client à chaque réponse admin. Écrans admin et mobile ajoutés.
+Le canal WhatsApp mentionné au cahier (§14) n'est pas fait — nécessite une
+clé API WhatsApp Business que nous n'avons pas dans ce sandbox.
 
-## 6. Observabilité et CI/CD
+## 6. CI/CD — ✅ fait (backend uniquement)
 
+Pipeline GitHub Actions (`.github/workflows/backend-tests.yml`) qui lance les
+134 tests backend (Postgres + Redis en services) sur chaque push/PR touchant
+`backend/`.
+
+Reste non fait :
 - Pas de Sentry, pas de Prometheus/Grafana (mentionnés dans la stack
-  recommandée du cahier, section 11.2).
-- Pas de pipeline CI (GitHub Actions) pour lancer automatiquement les 90
-  tests backend à chaque push/PR.
+  recommandée du cahier, section 11.2) — nécessitent un compte/clé externe.
+- Pas de pipeline CI pour `admin/` (build/lint) ni `mobile/` (pas de SDK
+  Android disponible pour un runner de toute façon).
 - `admin/` et `mobile/` n'ont pas de Dockerfile — seul `backend/` a un
   `docker-compose.yml`.
 
-## 7. Support client
+## 7. Notifications push
 
-Pas de module ticketing/réclamations (section 14 mentionne un canal support
-WhatsApp ou in-app — rien n'est implémenté).
+Seules les notifications in-app (table `notifications`, `GET /notifications`)
+existent. FCM/OneSignal n'est pas intégré — explicitement marqué optionnel
+dans le cahier ("seulement si le temps le permet"), et nécessite un projet
+Firebase que nous n'avons pas.
 
 ## 8. Hors-scope volontaire (attendu à ce stade, pas un manque de qualité)
 
@@ -99,11 +113,13 @@ ultérieures du cahier (section 24, Phase 3+) :
 
 | Domaine | État |
 |---|---|
-| Backend | ✅ 112 tests passants, tous les blocs 1-12 + retrait + frais/limites + conformité |
-| Admin Next.js | ✅ Vérifié en live, mais couverture fonctionnelle partielle (pas encore d'écran frais/limites/conformité) |
-| Mobile Kotlin | ⚠️ Écrit, jamais compilé/testé |
-| Frais/Limites configurables | ✅ Fait (`fee_rules`/`limit_rules`, CRUD admin) |
-| Conformité/Risque | ✅ Détection de base faite (alertes), scoring/gel de compte restants |
-| Push notifications | ❌ Non fait (optionnel) |
-| CI/CD, observabilité | ❌ Non fait |
+| Backend | ✅ 134 tests passants — tous les blocs + retrait + frais/limites + conformité + support |
+| Admin Next.js | ✅ Toutes les fonctionnalités backend ont un écran, vérifié en direct |
+| Mobile Kotlin | ⚠️ Écrit (dont support client), jamais compilé/testé — pas de SDK Android ici |
+| Frais/Limites configurables | ✅ Fait |
+| Conformité/Risque | ✅ Fait (alertes, score, gel auto + déblocage, export) |
+| Support client | ✅ Fait (in-app) — WhatsApp non fait (clé API manquante) |
+| CI/CD backend | ✅ Fait (GitHub Actions) |
+| Observabilité (Sentry/Prometheus) | ❌ Non fait (nécessite des clés externes) |
+| Push notifications | ❌ Non fait (optionnel, nécessite un projet Firebase) |
 | Intégrations réelles (providers) | ❌ Hors scope MVP sandbox |
