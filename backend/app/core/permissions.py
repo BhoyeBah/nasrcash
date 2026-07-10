@@ -52,6 +52,40 @@ COMPLIANCE_RESOLVE_ROLES = {
     AdminRole.COMPLIANCE_OFFICER,
 }
 
+# Roles allowed to block/unblock a card from the back-office.
+CARDS_WRITE_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.COMPLIANCE_OFFICER,
+    AdminRole.OPERATIONS_AGENT,
+}
+
+# Roles allowed to read the audit journal.
+AUDIT_VIEW_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.AUDITOR,
+    AdminRole.COMPLIANCE_OFFICER,
+    AdminRole.RISK_ANALYST,
+}
+
+# Roles allowed to export accounting/ledger data.
+ACCOUNTING_EXPORT_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.FINANCE_MANAGER,
+    AdminRole.AUDITOR,
+}
+
+# Only super_admin manages other admin accounts (create/change role/deactivate).
+ADMIN_MANAGEMENT_ROLES = {
+    AdminRole.SUPER_ADMIN,
+}
+
+# Roles allowed to view/reply/close customer support tickets.
+SUPPORT_ROLES = {
+    AdminRole.SUPER_ADMIN,
+    AdminRole.SUPPORT_AGENT,
+    AdminRole.OPERATIONS_AGENT,
+}
+
 
 def require_role(role: AdminRole, allowed: set[AdminRole]) -> None:
     if role not in allowed:

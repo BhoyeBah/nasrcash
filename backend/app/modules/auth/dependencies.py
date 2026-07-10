@@ -21,7 +21,7 @@ async def get_current_user(
 
     payload = decode_token(credentials.credentials, TokenType.ACCESS)
     user = await db.get(User, uuid.UUID(payload["sub"]))
-    if user is None or user.status == UserStatus.CLOSED.value:
-        raise UnauthorizedError("Utilisateur introuvable ou compte fermé")
+    if user is None or user.status in (UserStatus.CLOSED.value, UserStatus.SUSPENDED.value):
+        raise UnauthorizedError("Utilisateur introuvable ou compte fermé/suspendu")
 
     return user

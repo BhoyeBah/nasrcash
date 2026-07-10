@@ -1,13 +1,15 @@
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.models import AuditLog
 
 
 class AuditService:
-    """Write-only interface to the audit journal. There is deliberately no
-    update or delete method — this table is append-only by construction."""
+    """Interface to the audit journal. There is deliberately no update or
+    delete method — this table is append-only by construction, only reads
+    and inserts."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -34,3 +36,21 @@ class AuditService:
         self.db.add(entry)
         await self.db.flush()
         return entry
+
+    async def list_logs(
+        self,
+        actor_type: str | None = None,
+        action: str | None = None,
+        target_type: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[AuditLog]:
+        query = select(AuditLog).order_by(AuditLog.created_at.desc())
+        if actor_type is not None:
+            query = query.where(AuditLog.actor_type == actor_type)
+        if action is not None:
+            query = query.where(AuditLog.action == action)
+        if target_type is not None:
+            query = query.where(AuditLog.target_type == target_type)
+        result = await self.db.execute(query.limit(limit).offset(offset))
+        return list(result.scalars())

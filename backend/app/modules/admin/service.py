@@ -1,10 +1,15 @@
+import csv
+import io
+import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import UnauthorizedError
-from app.core.security import verify_secret
+from app.core.exceptions import ConflictError, NotFoundError, UnauthorizedError, ValidationError
+from app.core.permissions import AdminRole
+from app.core.security import hash_secret, verify_secret
 from app.modules.admin.models import AdminUser
 from app.modules.auth.models import User
 from app.modules.cards.models import Card
@@ -109,3 +114,70 @@ class AdminService:
             select(LedgerEntry).order_by(LedgerEntry.created_at.desc()).limit(limit).offset(offset)
         )
         return list(result.scalars())
+
+    async def list_cards(self, limit: int = 50, offset: int = 0) -> list[Card]:
+        result = await self.db.execute(
+            select(Card).order_by(Card.created_at.desc()).limit(limit).offset(offset)
+        )
+        return list(result.scalars())
+
+    # --- admin user (back-office account) management ---
+
+    async def list_admin_users(self) -> list[AdminUser]:
+        result = await self.db.execute(select(AdminUser).order_by(AdminUser.created_at.desc()))
+        return list(result.scalars())
+
+    async def create_admin_user(self, email: str, password: str, role: str) -> AdminUser:
+        if role not in {r.value for r in AdminRole}:
+            raise ValidationError(f"Rôle admin invalide : {role}")
+        existing = await self.db.execute(select(AdminUser).where(AdminUser.email == email))
+        if existing.scalar_one_or_none() is not None:
+            raise ConflictError("Un compte admin existe déjà avec cet email")
+
+        admin = AdminUser(email=email, password_hash=hash_secret(password), role=role)
+        self.db.add(admin)
+        await self.db.flush()
+        return admin
+
+    async def update_admin_role(self, admin_id: uuid.UUID, role: str) -> AdminUser:
+        if role not in {r.value for r in AdminRole}:
+            raise ValidationError(f"Rôle admin invalide : {role}")
+        admin = await self.db.get(AdminUser, admin_id)
+        if admin is None:
+            raise NotFoundError("Compte admin introuvable")
+        admin.role = role
+        await self.db.flush()
+        return admin
+
+    async def set_admin_active(self, admin_id: uuid.UUID, is_active: bool) -> AdminUser:
+        admin = await self.db.get(AdminUser, admin_id)
+        if admin is None:
+            raise NotFoundError("Compte admin introuvable")
+        admin.is_active = is_active
+        await self.db.flush()
+        return admin
+
+    # --- accounting export ---
+
+    async def export_ledger_csv(
+        self, since: datetime | None = None, until: datetime | None = None
+    ) -> str:
+        query = select(LedgerEntry).order_by(LedgerEntry.created_at.asc())
+        if since is not None:
+            query = query.where(LedgerEntry.created_at >= since)
+        if until is not None:
+            query = query.where(LedgerEntry.created_at <= until)
+        result = await self.db.execute(query)
+        entries = list(result.scalars())
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            ["id", "ledger_transaction_id", "account_id", "direction", "amount", "currency", "created_at"]
+        )
+        for entry in entries:
+            writer.writerow([
+                entry.id, entry.ledger_transaction_id, entry.account_id, entry.direction,
+                entry.amount, entry.currency, entry.created_at.isoformat(),
+            ])
+        return buffer.getvalue()

@@ -1,14 +1,21 @@
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import NotFoundError
 from app.core.permissions import (
+    ACCOUNTING_EXPORT_ROLES,
+    ADMIN_MANAGEMENT_ROLES,
+    AUDIT_VIEW_ROLES,
+    CARDS_WRITE_ROLES,
     COMPLIANCE_RESOLVE_ROLES,
     COMPLIANCE_VIEW_ROLES,
     FEES_LIMITS_WRITE_ROLES,
     KYC_REVIEWER_ROLES,
+    SUPPORT_ROLES,
     AdminRole,
 )
 from app.core.rate_limit import rate_limiter
@@ -16,6 +23,11 @@ from app.core.security import create_admin_access_token
 from app.modules.admin.dependencies import require_admin_roles
 from app.modules.admin.models import AdminUser
 from app.modules.admin.schemas import (
+    AdminAccountActiveUpdateRequest,
+    AdminAccountCreateRequest,
+    AdminAccountResponse,
+    AdminAccountRoleUpdateRequest,
+    AdminCardListItem,
     AdminKycPendingItem,
     AdminKycRejectRequest,
     AdminLoginRequest,
@@ -25,14 +37,32 @@ from app.modules.admin.schemas import (
     DashboardResponse,
 )
 from app.modules.admin.service import AdminService
-from app.modules.compliance.schemas import ComplianceAlertResolveRequest, ComplianceAlertResponse
+from app.modules.audit.schemas import AuditLogResponse
+from app.modules.audit.service import AuditService
+from app.modules.cards.models import Card
+from app.modules.cards.schemas import CardResponse
+from app.modules.cards.service import CardService
+from app.modules.compliance.schemas import (
+    ComplianceAlertResolveRequest,
+    ComplianceAlertResponse,
+    RiskScoreResponse,
+)
 from app.modules.compliance.service import ComplianceService
 from app.modules.fees.schemas import FeeRuleCreateRequest, FeeRuleResponse
 from app.modules.fees.service import FeeService
+from app.modules.fx.schemas import FxRateResponse, UpdateFxRateRequest
+from app.modules.fx.service import FXService
 from app.modules.kyc.schemas import KycProfileResponse
 from app.modules.kyc.service import KycService
 from app.modules.limits.schemas import LimitRuleCreateRequest, LimitRuleResponse
 from app.modules.limits.service import LimitService
+from app.modules.support.schemas import (
+    MessageCreateRequest,
+    MessageResponse,
+    TicketDetailResponse,
+    TicketResponse,
+)
+from app.modules.support.service import SupportService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -237,3 +267,244 @@ async def dismiss_compliance_alert(
     alert = await service.dismiss_alert(alert_id, admin.id, payload.resolution_notes)
     await db.commit()
     return alert
+
+
+@router.get("/compliance/users/{user_id}/risk-score", response_model=RiskScoreResponse)
+async def get_user_risk_score(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(COMPLIANCE_VIEW_ROLES)),
+):
+    service = ComplianceService(db)
+    return await service.compute_risk_score(user_id)
+
+
+@router.post("/compliance/users/{user_id}/unfreeze", response_model=AdminUserListItem)
+async def unfreeze_user(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(COMPLIANCE_RESOLVE_ROLES)),
+):
+    service = ComplianceService(db)
+    user = await service.unfreeze_user(user_id, admin.id)
+    await db.commit()
+    return user
+
+
+@router.get("/compliance/report")
+async def export_compliance_report(
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(COMPLIANCE_VIEW_ROLES)),
+):
+    service = ComplianceService(db)
+    csv_content = await service.export_alerts_csv(since=since, until=until)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=compliance_report.csv"},
+    )
+
+
+@router.get("/cards", response_model=list[AdminCardListItem])
+async def list_cards(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ANY_ADMIN_ROLE)),
+):
+    service = AdminService(db)
+    return await service.list_cards(limit=limit, offset=offset)
+
+
+@router.post("/cards/{card_id}/block", response_model=CardResponse)
+async def block_card(
+    card_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(CARDS_WRITE_ROLES)),
+):
+    card = await db.get(Card, card_id)
+    if card is None:
+        raise NotFoundError("Carte introuvable")
+    service = CardService(db)
+    card = await service.admin_block(card, admin.id)
+    await db.commit()
+    return card
+
+
+@router.post("/cards/{card_id}/unblock", response_model=CardResponse)
+async def unblock_card(
+    card_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(CARDS_WRITE_ROLES)),
+):
+    card = await db.get(Card, card_id)
+    if card is None:
+        raise NotFoundError("Carte introuvable")
+    service = CardService(db)
+    card = await service.admin_unblock(card, admin.id)
+    await db.commit()
+    return card
+
+
+@router.get("/fx-rates", response_model=list[FxRateResponse])
+async def list_fx_rates(
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ANY_ADMIN_ROLE)),
+):
+    service = FXService(db)
+    return await service.list_rates()
+
+
+@router.post("/fx-rates", response_model=FxRateResponse)
+async def create_fx_rate(
+    payload: UpdateFxRateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(FEES_LIMITS_WRITE_ROLES)),
+):
+    service = FXService(db)
+    fx_rate = await service.set_rate(payload.base_currency, payload.quote_currency, payload.rate)
+    await db.commit()
+    return fx_rate
+
+
+@router.get("/audit-logs", response_model=list[AuditLogResponse])
+async def list_audit_logs(
+    actor_type: str | None = Query(None),
+    action: str | None = Query(None),
+    target_type: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(AUDIT_VIEW_ROLES)),
+):
+    service = AuditService(db)
+    return await service.list_logs(
+        actor_type=actor_type, action=action, target_type=target_type, limit=limit, offset=offset
+    )
+
+
+@router.get("/accounting/export")
+async def export_accounting_ledger(
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ACCOUNTING_EXPORT_ROLES)),
+):
+    service = AdminService(db)
+    csv_content = await service.export_ledger_csv(since=since, until=until)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ledger_export.csv"},
+    )
+
+
+@router.get("/accounts", response_model=list[AdminAccountResponse])
+async def list_admin_accounts(
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ADMIN_MANAGEMENT_ROLES)),
+):
+    service = AdminService(db)
+    return await service.list_admin_users()
+
+
+@router.post("/accounts", response_model=AdminAccountResponse)
+async def create_admin_account(
+    payload: AdminAccountCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ADMIN_MANAGEMENT_ROLES)),
+):
+    service = AdminService(db)
+    account = await service.create_admin_user(payload.email, payload.password, payload.role)
+    await db.commit()
+    return account
+
+
+@router.post("/accounts/{admin_id}/role", response_model=AdminAccountResponse)
+async def update_admin_account_role(
+    admin_id: uuid.UUID,
+    payload: AdminAccountRoleUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ADMIN_MANAGEMENT_ROLES)),
+):
+    service = AdminService(db)
+    account = await service.update_admin_role(admin_id, payload.role)
+    await db.commit()
+    return account
+
+
+@router.post("/accounts/{admin_id}/active", response_model=AdminAccountResponse)
+async def update_admin_account_active(
+    admin_id: uuid.UUID,
+    payload: AdminAccountActiveUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(ADMIN_MANAGEMENT_ROLES)),
+):
+    service = AdminService(db)
+    account = await service.set_admin_active(admin_id, payload.is_active)
+    await db.commit()
+    return account
+
+
+@router.get("/support/tickets", response_model=list[TicketResponse])
+async def list_support_tickets(
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(SUPPORT_ROLES)),
+):
+    service = SupportService(db)
+    return await service.list_all(status=status)
+
+
+@router.get("/support/tickets/{ticket_id}", response_model=TicketDetailResponse)
+async def get_support_ticket(
+    ticket_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(SUPPORT_ROLES)),
+):
+    service = SupportService(db)
+    ticket = await service.get_ticket(ticket_id)
+    messages = await service.list_messages(ticket_id)
+    return TicketDetailResponse(ticket=ticket, messages=messages)
+
+
+@router.post("/support/tickets/{ticket_id}/messages", response_model=MessageResponse)
+async def reply_support_ticket(
+    ticket_id: uuid.UUID,
+    payload: MessageCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(require_admin_roles(SUPPORT_ROLES)),
+):
+    service = SupportService(db)
+    ticket = await service.get_ticket(ticket_id)
+    message = await service.add_admin_reply(ticket, admin.id, payload.body)
+    await db.commit()
+    return message
+
+
+@router.post("/support/tickets/{ticket_id}/resolve", response_model=TicketResponse)
+async def resolve_support_ticket(
+    ticket_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(SUPPORT_ROLES)),
+):
+    service = SupportService(db)
+    ticket = await service.get_ticket(ticket_id)
+    ticket = await service.resolve_ticket(ticket)
+    await db.commit()
+    return ticket
+
+
+@router.post("/support/tickets/{ticket_id}/close", response_model=TicketResponse)
+async def close_support_ticket(
+    ticket_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(require_admin_roles(SUPPORT_ROLES)),
+):
+    service = SupportService(db)
+    ticket = await service.get_ticket(ticket_id)
+    ticket = await service.close_ticket(ticket)
+    await db.commit()
+    return ticket

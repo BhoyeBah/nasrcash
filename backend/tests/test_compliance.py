@@ -1,4 +1,9 @@
+import uuid
+from decimal import Decimal
+
 from app.core.config import get_settings
+from app.modules.auth.models import User
+from app.modules.compliance.service import ComplianceService
 
 
 async def _admin_headers(client):
@@ -238,3 +243,100 @@ async def test_compliance_resolve_requires_resolver_role(client, db_session):
         json={},
     )
     assert resolve_resp.status_code == 403
+
+
+async def test_auto_freeze_triggers_on_critical_alert(client, db_session):
+    headers, user_id = await _register_and_login(client, "+224644400006")
+
+    service = ComplianceService(db_session)
+    # 35,000,000 is >= 10x the 3,000,000 large-transaction threshold, which
+    # raises a single CRITICAL alert (weight 15) — enough on its own to cross
+    # the default auto-freeze threshold (15).
+    await service.check_large_transaction(uuid.UUID(user_id), Decimal("35000000"), "topup")
+    await db_session.commit()
+
+    user = await db_session.get(User, uuid.UUID(user_id))
+    assert user.status == "suspended"
+
+    # The user's existing access token is now rejected on every endpoint.
+    blocked_resp = await client.get("/api/v1/wallets", headers=headers)
+    assert blocked_resp.status_code == 401
+
+
+async def test_risk_score_endpoint_and_manual_unfreeze(client, db_session):
+    headers, user_id = await _register_and_login(client, "+224644400007")
+
+    service = ComplianceService(db_session)
+    await service.check_large_transaction(uuid.UUID(user_id), Decimal("35000000"), "topup")
+    await db_session.commit()
+
+    admin_headers = await _admin_headers(client)
+    score_resp = await client.get(
+        f"/api/v1/admin/compliance/users/{user_id}/risk-score", headers=admin_headers
+    )
+    assert score_resp.status_code == 200, score_resp.text
+    assert score_resp.json()["score"] >= 15
+    assert score_resp.json()["breakdown"]["critical"] == 1
+
+    unfreeze_resp = await client.post(
+        f"/api/v1/admin/compliance/users/{user_id}/unfreeze", headers=admin_headers
+    )
+    assert unfreeze_resp.status_code == 200, unfreeze_resp.text
+    assert unfreeze_resp.json()["status"] == "active"
+
+    # The account works again with its original token.
+    ok_resp = await client.get("/api/v1/wallets", headers=headers)
+    assert ok_resp.status_code == 200
+
+    # Unfreezing an already-active account is a conflict.
+    second_unfreeze = await client.post(
+        f"/api/v1/admin/compliance/users/{user_id}/unfreeze", headers=admin_headers
+    )
+    assert second_unfreeze.status_code == 409
+
+
+async def test_compliance_report_export_is_csv(client, db_session):
+    headers, user_id = await _register_and_login(client, "+224644400008")
+
+    service = ComplianceService(db_session)
+    await service.record_limit_breach(uuid.UUID(user_id), "topup", {"amount": "1"})
+    await db_session.commit()
+
+    admin_headers = await _admin_headers(client)
+    report_resp = await client.get("/api/v1/admin/compliance/report", headers=admin_headers)
+    assert report_resp.status_code == 200
+    assert report_resp.headers["content-type"].startswith("text/csv")
+    assert "limit_exceeded_attempt" in report_resp.text
+
+
+async def test_frozen_account_declines_card_payment(client, db_session):
+    headers, user_id = await _kyc2_user(client, "+224644400009")
+    wallet_id = await _wallet_id(client, headers)
+    await _topup_and_confirm(client, headers, wallet_id, "5000000")
+
+    card_resp = await client.post("/api/v1/cards", headers=headers)
+    assert card_resp.status_code == 200, card_resp.text
+    card_id = card_resp.json()["id"]
+
+    fund_resp = await client.post(
+        f"/api/v1/cards/{card_id}/fund",
+        headers=headers,
+        json={"amount": "100000", "idempotency_key": str(uuid.uuid4())},
+    )
+    assert fund_resp.status_code == 200, fund_resp.text
+
+    service = ComplianceService(db_session)
+    await service.check_large_transaction(uuid.UUID(user_id), Decimal("35000000"), "manual")
+    await db_session.commit()
+
+    payment_resp = await client.post(
+        f"/api/v1/sandbox/cards/{card_id}/simulate-payment",
+        json={
+            "merchant_name": "Amazon",
+            "merchant_amount": "10",
+            "merchant_currency": "USD",
+        },
+    )
+    assert payment_resp.status_code == 200, payment_resp.text
+    assert payment_resp.json()["status"] == "declined"
+    assert payment_resp.json()["decline_reason"] == "account_frozen"

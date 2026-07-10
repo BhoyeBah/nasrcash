@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     compliance_velocity_window_minutes: int = 10
     compliance_velocity_max_count: int = 5
 
+    # Aggregate risk score (weighted sum of open/reviewing alerts over a
+    # rolling window) at or above which an account is auto-frozen.
+    compliance_risk_auto_freeze_threshold: int = 15
+    compliance_risk_window_days: int = 30
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"

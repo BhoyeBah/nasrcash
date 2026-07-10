@@ -1,3 +1,5 @@
+import csv
+import io
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -7,17 +9,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError, NotFoundError
+from app.modules.audit.service import AuditService
+from app.modules.auth.models import User, UserStatus
 from app.modules.cards.models import Card
 from app.modules.compliance.models import AlertSeverity, AlertStatus, AlertType, ComplianceAlert
+from app.modules.notifications.models import NotificationType
+from app.modules.notifications.service import NotificationService
 from app.modules.payments.models import CardPayment, PaymentStatus
 from app.modules.topups.models import Topup, TopupStatus
+from app.modules.wallets.models import Wallet, WalletStatus
 from app.modules.withdrawals.models import Withdrawal, WithdrawalStatus
+
+# Weighted contribution of an open/reviewing alert to a user's aggregate risk
+# score — a single CRITICAL alert is enough to cross the default auto-freeze
+# threshold on its own; lower severities only add up through repetition.
+SEVERITY_WEIGHTS = {
+    AlertSeverity.LOW: 1,
+    AlertSeverity.MEDIUM: 3,
+    AlertSeverity.HIGH: 7,
+    AlertSeverity.CRITICAL: 15,
+}
+
+OPEN_ALERT_STATUSES = (AlertStatus.OPEN.value, AlertStatus.REVIEWING.value)
 
 
 class ComplianceService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.settings = get_settings()
+        self.audit = AuditService(db)
+        self.notifications = NotificationService(db)
 
     async def _create_alert(
         self,
@@ -35,6 +56,7 @@ class ComplianceService:
         )
         self.db.add(alert)
         await self.db.flush()
+        await self._maybe_auto_freeze(user_id)
         return alert
 
     async def check_large_transaction(
@@ -44,7 +66,12 @@ class ComplianceService:
         if amount < threshold:
             return None
 
-        severity = AlertSeverity.HIGH if amount >= threshold * 3 else AlertSeverity.MEDIUM
+        if amount >= threshold * 10:
+            severity = AlertSeverity.CRITICAL
+        elif amount >= threshold * 3:
+            severity = AlertSeverity.HIGH
+        else:
+            severity = AlertSeverity.MEDIUM
         return await self._create_alert(
             user_id,
             AlertType.LARGE_TRANSACTION,
@@ -165,3 +192,102 @@ class ComplianceService:
         self, alert_id: uuid.UUID, admin_id: uuid.UUID, resolution_notes: str | None
     ) -> ComplianceAlert:
         return await self._transition(alert_id, AlertStatus.DISMISSED, admin_id, resolution_notes)
+
+    # --- risk scoring & auto-freeze ---
+
+    async def compute_risk_score(self, user_id: uuid.UUID) -> dict:
+        since = datetime.now(timezone.utc) - timedelta(days=self.settings.compliance_risk_window_days)
+        result = await self.db.execute(
+            select(ComplianceAlert.severity, func.count()).where(
+                ComplianceAlert.user_id == user_id,
+                ComplianceAlert.status.in_(OPEN_ALERT_STATUSES),
+                ComplianceAlert.created_at >= since,
+            ).group_by(ComplianceAlert.severity)
+        )
+        breakdown = {severity: count for severity, count in result.all()}
+        score = sum(
+            SEVERITY_WEIGHTS[AlertSeverity(severity)] * count for severity, count in breakdown.items()
+        )
+        return {
+            "user_id": user_id,
+            "score": score,
+            "alert_count": sum(breakdown.values()),
+            "breakdown": breakdown,
+            "window_days": self.settings.compliance_risk_window_days,
+        }
+
+    async def _maybe_auto_freeze(self, user_id: uuid.UUID) -> None:
+        risk = await self.compute_risk_score(user_id)
+        if risk["score"] < self.settings.compliance_risk_auto_freeze_threshold:
+            return
+
+        user = await self.db.get(User, user_id)
+        if user is None or user.status == UserStatus.SUSPENDED.value:
+            return  # already frozen — avoid duplicate audit entries/notifications
+
+        user.status = UserStatus.SUSPENDED.value
+
+        wallet_result = await self.db.execute(select(Wallet).where(Wallet.user_id == user_id))
+        wallet = wallet_result.scalar_one_or_none()
+        if wallet is not None:
+            wallet.status = WalletStatus.BLOCKED.value
+
+        await self.db.flush()
+        await self.audit.log(
+            actor_type="system", action="compliance.auto_freeze",
+            target_type="user", target_id=str(user_id),
+            context={"risk_score": risk["score"], "alert_count": risk["alert_count"]},
+        )
+        await self.notifications.create(
+            user_id, NotificationType.SECURITY_ALERT.value,
+            "Compte suspendu",
+            "Votre compte a été temporairement suspendu suite à une activité suspecte. "
+            "Contactez le support pour plus d'informations.",
+        )
+
+    async def unfreeze_user(self, user_id: uuid.UUID, admin_id: uuid.UUID) -> User:
+        user = await self.db.get(User, user_id)
+        if user is None:
+            raise NotFoundError("Utilisateur introuvable")
+        if user.status != UserStatus.SUSPENDED.value:
+            raise ConflictError("Ce compte n'est pas suspendu")
+
+        user.status = UserStatus.ACTIVE.value
+
+        wallet_result = await self.db.execute(select(Wallet).where(Wallet.user_id == user_id))
+        wallet = wallet_result.scalar_one_or_none()
+        if wallet is not None and wallet.status == WalletStatus.BLOCKED.value:
+            wallet.status = WalletStatus.ACTIVE.value
+
+        await self.db.flush()
+        await self.audit.log(
+            actor_type="admin", actor_id=admin_id, action="compliance.manual_unfreeze",
+            target_type="user", target_id=str(user_id),
+        )
+        return user
+
+    # --- exportable report ---
+
+    async def export_alerts_csv(
+        self, since: datetime | None = None, until: datetime | None = None
+    ) -> str:
+        query = select(ComplianceAlert).order_by(ComplianceAlert.created_at.asc())
+        if since is not None:
+            query = query.where(ComplianceAlert.created_at >= since)
+        if until is not None:
+            query = query.where(ComplianceAlert.created_at <= until)
+        result = await self.db.execute(query)
+        alerts = list(result.scalars())
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(
+            ["id", "user_id", "alert_type", "severity", "status", "created_at", "resolved_at", "resolved_by"]
+        )
+        for alert in alerts:
+            writer.writerow([
+                alert.id, alert.user_id, alert.alert_type, alert.severity, alert.status,
+                alert.created_at.isoformat(), alert.resolved_at.isoformat() if alert.resolved_at else "",
+                alert.resolved_by or "",
+            ])
+        return buffer.getvalue()

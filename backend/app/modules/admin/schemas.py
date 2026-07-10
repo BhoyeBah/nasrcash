@@ -60,3 +60,43 @@ class AdminTransactionItem(BaseModel):
     amount: Decimal
     currency: str
     created_at: datetime
+
+
+class AdminCardListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    masked_pan: str
+    brand: str
+    status: str
+    displayed_currency: str
+    created_at: datetime
+
+
+# --- back-office account (admin_users) management — distinct from
+# AdminUserListItem above, which lists NasrCash *customers*, not staff. ---
+
+
+class AdminAccountResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class AdminAccountCreateRequest(BaseModel):
+    email: str
+    password: str
+    role: str
+
+
+class AdminAccountRoleUpdateRequest(BaseModel):
+    role: str
+
+
+class AdminAccountActiveUpdateRequest(BaseModel):
+    is_active: bool

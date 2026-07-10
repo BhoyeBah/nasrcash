@@ -8,6 +8,7 @@ from app.modules.kyc.router import router as kyc_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.cards.router import router as cards_router
 from app.modules.sandbox.router import router as sandbox_router
+from app.modules.support.router import router as support_router
 from app.modules.topups.router import router as topups_router
 from app.modules.wallets.router import router as wallets_router
 from app.modules.withdrawals.router import router as withdrawals_router
@@ -31,6 +32,7 @@ app.include_router(cards_router)
 app.include_router(notifications_router)
 app.include_router(admin_router)
 app.include_router(sandbox_router)
+app.include_router(support_router)
 
 
 @app.get("/health", tags=["health"])

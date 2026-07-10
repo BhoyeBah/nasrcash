@@ -132,6 +132,36 @@ class CardService:
         )
         return card
 
+    async def admin_block(self, card: Card, admin_id: uuid.UUID) -> Card:
+        if card.status == CardStatus.CLOSED.value:
+            raise ConflictError("Impossible de bloquer une carte fermée")
+        if card.status == CardStatus.BLOCKED.value:
+            raise ConflictError("Cette carte est déjà bloquée")
+        await self.provider.freeze_card(card.provider_card_id)
+        card.status = CardStatus.BLOCKED.value
+        await self.db.flush()
+        await self.audit.log(
+            actor_type="admin", actor_id=admin_id, action="card.admin_blocked",
+            target_type="card", target_id=str(card.id),
+        )
+        await self.notifications.create(
+            card.user_id, NotificationType.CARD_FROZEN.value,
+            "Carte bloquée", f"Votre carte {card.masked_pan} a été bloquée par NasrCash.",
+        )
+        return card
+
+    async def admin_unblock(self, card: Card, admin_id: uuid.UUID) -> Card:
+        if card.status != CardStatus.BLOCKED.value:
+            raise ConflictError(f"Impossible de débloquer une carte au statut '{card.status}'")
+        await self.provider.unfreeze_card(card.provider_card_id)
+        card.status = CardStatus.ACTIVE.value
+        await self.db.flush()
+        await self.audit.log(
+            actor_type="admin", actor_id=admin_id, action="card.admin_unblocked",
+            target_type="card", target_id=str(card.id),
+        )
+        return card
+
     async def get_balance(self, card: Card) -> Decimal:
         balance = await self.ledger.get_account_balance(
             card_account_id(card.id), card.displayed_currency

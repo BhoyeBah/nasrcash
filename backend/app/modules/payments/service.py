@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, ForbiddenError, LimitExceededError, NotFoundError, ValidationError
 from app.modules.audit.service import AuditService
-from app.modules.auth.models import User
+from app.modules.auth.models import User, UserStatus
 from app.modules.cards.models import Card, CardStatus
 from app.modules.cards.service import card_account_id
 from app.modules.compliance.service import ComplianceService
@@ -124,6 +124,12 @@ class PaymentService:
             )
 
         cardholder = await self.db.get(User, card.user_id)
+
+        if cardholder.status == UserStatus.SUSPENDED.value:
+            return await self._decline(
+                card, merchant_name, merchant_amount, merchant_currency, provider_reference,
+                DeclineReason.ACCOUNT_FROZEN.value,
+            )
 
         local_amount, fx_rate = await self.fx.convert(
             merchant_amount, merchant_currency, card.displayed_currency

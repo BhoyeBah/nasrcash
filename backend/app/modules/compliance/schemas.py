@@ -21,3 +21,11 @@ class ComplianceAlertResponse(BaseModel):
 
 class ComplianceAlertResolveRequest(BaseModel):
     resolution_notes: str | None = None
+
+
+class RiskScoreResponse(BaseModel):
+    user_id: uuid.UUID
+    score: int
+    alert_count: int
+    breakdown: dict[str, int]
+    window_days: int

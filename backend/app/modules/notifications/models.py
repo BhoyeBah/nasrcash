@@ -23,6 +23,7 @@ class NotificationType(StrEnum):
     PAYMENT_DECLINED = "payment_declined"
     CARD_FROZEN = "card_frozen"
     SECURITY_ALERT = "security_alert"
+    SUPPORT_REPLY = "support_reply"
 
 
 class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):

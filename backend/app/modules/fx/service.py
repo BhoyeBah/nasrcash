@@ -46,3 +46,9 @@ class FXService:
         fx_rate = await self.get_current_rate(base_currency, quote_currency)
         converted = (amount * fx_rate.rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         return converted, fx_rate
+
+    async def list_rates(self) -> list[FxRate]:
+        """Full append-only history, newest first — the admin screen shows
+        the currently active rate per pair plus how it has moved over time."""
+        result = await self.db.execute(select(FxRate).order_by(FxRate.created_at.desc()))
+        return list(result.scalars())
