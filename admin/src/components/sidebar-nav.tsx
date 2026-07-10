@@ -2,7 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, ShieldCheck, Receipt, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  Receipt,
+  LogOut,
+  CreditCard,
+  ArrowLeftRight,
+  Gauge,
+  Percent,
+  FileClock,
+  FileSpreadsheet,
+  AlertTriangle,
+  LifeBuoy,
+  UserCog,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions";
@@ -12,6 +27,15 @@ const NAV_ITEMS = [
   { href: "/dashboard/users", label: "Utilisateurs", icon: Users },
   { href: "/dashboard/kyc", label: "KYC en attente", icon: ShieldCheck },
   { href: "/dashboard/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard/cards", label: "Cartes", icon: CreditCard },
+  { href: "/dashboard/fx", label: "Taux de change", icon: ArrowLeftRight },
+  { href: "/dashboard/limits", label: "Plafonds", icon: Gauge },
+  { href: "/dashboard/fees", label: "Frais", icon: Percent },
+  { href: "/dashboard/compliance", label: "Conformité & risque", icon: AlertTriangle },
+  { href: "/dashboard/support", label: "Support client", icon: LifeBuoy },
+  { href: "/dashboard/audit", label: "Journal d'audit", icon: FileClock },
+  { href: "/dashboard/accounting", label: "Export comptable", icon: FileSpreadsheet },
+  { href: "/dashboard/accounts", label: "Comptes admin", icon: UserCog },
 ];
 
 export function SidebarNav() {

@@ -44,6 +44,12 @@ const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
   suspended: "destructive",
   closed: "outline",
   restricted: "destructive",
+  blocked: "destructive",
+  open: "warning",
+  in_progress: "warning",
+  reviewing: "warning",
+  resolved: "success",
+  dismissed: "outline",
 };
 
 export function StatusBadge({ status }: { status: string }) {
