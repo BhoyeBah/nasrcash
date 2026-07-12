@@ -14,9 +14,9 @@ import androidx.compose.ui.unit.dp
 fun LoadingButton(
     text: String,
     isLoading: Boolean,
-    enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Button(onClick = onClick, enabled = enabled && !isLoading, modifier = modifier) {
         if (isLoading) {
