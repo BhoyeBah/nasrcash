@@ -9,7 +9,7 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** Thin 1:1 mapping of the NasrCash backend's public API — see backend/app/modules/*/router.py. */
+/** Thin 1:1 mapping of the NasrCash backend's public API — see the router.py files under backend/app/modules. */
 interface ApiService {
 
     // --- auth ---
@@ -132,7 +132,7 @@ interface ApiService {
     suspend fun addTicketMessage(
         @Path("ticketId") ticketId: String,
         @Body body: MessageCreateRequest,
-    ): MessageResponse
+    ): TicketMessageResponse
 
     // --- notifications ---
     @GET("api/v1/notifications")

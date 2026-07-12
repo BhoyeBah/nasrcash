@@ -181,7 +181,7 @@ data class TicketResponse(
 )
 
 @Serializable
-data class MessageResponse(
+data class TicketMessageResponse(
     val id: String,
     val ticket_id: String,
     val sender_type: String,
@@ -191,7 +191,7 @@ data class MessageResponse(
 )
 
 @Serializable
-data class TicketDetailResponse(val ticket: TicketResponse, val messages: List<MessageResponse>)
+data class TicketDetailResponse(val ticket: TicketResponse, val messages: List<TicketMessageResponse>)
 
 // notifications
 

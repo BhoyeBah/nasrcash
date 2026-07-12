@@ -3,7 +3,7 @@ package com.nasrcash.app.ui.support
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nasrcash.app.core.network.ApiResult
-import com.nasrcash.app.core.network.MessageResponse
+import com.nasrcash.app.core.network.TicketMessageResponse
 import com.nasrcash.app.core.network.TicketResponse
 import com.nasrcash.app.data.repository.SupportRepository
 import com.nasrcash.app.ui.common.UiState
@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-data class TicketDetailData(val ticket: TicketResponse, val messages: List<MessageResponse>)
+data class TicketDetailData(val ticket: TicketResponse, val messages: List<TicketMessageResponse>)
 
 class SupportDetailViewModel(
     private val supportRepository: SupportRepository,

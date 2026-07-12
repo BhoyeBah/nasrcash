@@ -25,7 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nasrcash.app.core.network.MessageResponse
+import com.nasrcash.app.core.network.TicketMessageResponse
 import com.nasrcash.app.ui.common.ErrorText
 import com.nasrcash.app.ui.common.LoadingButton
 import com.nasrcash.app.ui.common.UiState
@@ -88,7 +88,7 @@ fun SupportDetailScreen(ticketId: String) {
 }
 
 @Composable
-private fun MessageBubble(message: MessageResponse) {
+private fun MessageBubble(message: TicketMessageResponse) {
     val isAdmin = message.sender_type == "admin"
     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(
