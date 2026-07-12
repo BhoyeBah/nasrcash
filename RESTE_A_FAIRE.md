@@ -4,7 +4,7 @@ Résumé de l'écart entre le cahier des charges complet et l'état actuel du d�
 (`backend/`, `admin/`, `mobile/`). Voir `CAHIER_DES_CHARGES_NASRCASH.md` et
 `NASRCASH_TECH_SPEC.md` pour la spécification complète.
 
-## 1. Vérification de l'app mobile
+## 1. App mobile — ✅ compile et a des tests, pas encore tournée sur un vrai appareil
 
 En revoyant l'app côté fonctionnalités, un vrai trou a été trouvé et corrigé :
 il n'existait aucun écran pour **créer une carte virtuelle** (`issueCard()`
@@ -13,15 +13,35 @@ utilisateur KYC2 n'avait aucun moyen d'en créer une depuis l'app. Corrigé sur
 `HomeScreen`/`HomeViewModel`. Un module **support client** (créer un ticket,
 lister ses tickets, fil de discussion + réponse) a aussi été ajouté.
 
-L'app Kotlin/Jetpack Compose (`mobile/`) reste cependant **jamais compilée**
-— cet environnement n'a pas de SDK Android ni d'émulateur (Gradle est présent
-mais `ANDROID_HOME` ne l'est pas). Il faut :
+L'app n'avait **jamais été compilée** avant cette session (aucun environnement
+précédent n'avait de SDK Android). Un SDK a été installé ici (`sdkmanager`,
+platform 34, build-tools 34.0.0) et `./gradlew assembleDebug` tourne
+maintenant avec succès — un vrai APK debug est produit. Ça a mis au jour et
+corrigé plusieurs bugs réels qui dormaient dans le code depuis le début :
 
-- Ouvrir le projet dans Android Studio et corriger les erreurs de build de
-  premier essai (versions de dépendances, petits écarts d'API).
-- Tester le parcours complet sur émulateur : inscription → OTP → KYC →
-  carte → paiement → retrait → support.
-- Ajouter des tests instrumentés/unitaires côté mobile (aucun n'existe).
+- Le plugin Gradle `kotlinx.serialization` n'était **jamais appliqué**, alors
+  que toute la couche réseau en dépend (`@Serializable`, `Json.decodeFromString<T>()`)
+  — chaque modèle de réponse réseau échouait à résoudre son sérialiseur.
+- `TopAppBar` nécessite `@OptIn(ExperimentalMaterial3Api)` dans cette version
+  de Compose/Material3 — jamais ajouté (opt-in module-wide ajouté).
+- Un commentaire KDoc contenant `*/` en plein milieu du texte
+  (`modules/*/router.py`) fermait le commentaire prématurément et corrompait
+  le reste du fichier.
+- `LoadingButton` violait la convention Compose "modifier doit être le premier
+  paramètre optionnel" (flaggé par Android Lint, catégorie Correctness).
+
+**9 tests unitaires** ont aussi été ajoutés (HomeViewModel, SupportListViewModel)
+avec un faux `ApiService` réutilisable — les premiers tests jamais écrits côté
+mobile. Tous passent.
+
+Il reste :
+- Aucun émulateur/appareil disponible ici pour tester le parcours réel
+  (pas de `/dev/kvm`, pas d'extensions de virtualisation CPU dans ce
+  conteneur) — à faire sur une machine avec Android Studio + émulateur ou
+  un téléphone physique : inscription → OTP → KYC → carte → paiement →
+  retrait → support.
+- Étendre la couverture de tests unitaires aux autres ViewModels (topup,
+  retrait, cartes, KYC) en réutilisant le `FakeApiService`.
 
 ## 2. Back-office admin — ✅ fait
 
@@ -115,7 +135,7 @@ ultérieures du cahier (section 24, Phase 3+) :
 |---|---|
 | Backend | ✅ 134 tests passants — tous les blocs + retrait + frais/limites + conformité + support |
 | Admin Next.js | ✅ Toutes les fonctionnalités backend ont un écran, vérifié en direct |
-| Mobile Kotlin | ⚠️ Écrit (dont support client), jamais compilé/testé — pas de SDK Android ici |
+| Mobile Kotlin | ✅ Compile (`assembleDebug` OK) + 9 tests unitaires passants ; ⚠️ jamais lancée sur émulateur/appareil |
 | Frais/Limites configurables | ✅ Fait |
 | Conformité/Risque | ✅ Fait (alertes, score, gel auto + déblocage, export) |
 | Support client | ✅ Fait (in-app) — WhatsApp non fait (clé API manquante) |
