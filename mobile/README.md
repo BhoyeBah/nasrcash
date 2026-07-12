@@ -7,17 +7,17 @@ notifications. See
 `../CAHIER_DES_CHARGES_NASRCASH.md` and `../NASRCASH_TECH_SPEC.md` for the
 full product and technical specification.
 
-## ⚠️ Build status
+## ✅ Build status
 
-This module was written in an environment **without an Android SDK, Gradle,
-or an emulator available** — unlike `backend/` (79 passing pytest tests) and
-`admin/` (built, linted, and verified end-to-end against the live backend
-with screenshots), **this code has not been compiled or run**. Open it in
-Android Studio and expect to fix the usual first-build issues (dependency
-version bumps, minor API mismatches) before it runs. The architecture and
-API contracts are deliberately kept simple and closely mirror the backend's
-actual schemas to minimize that risk, but treat this as a solid first draft
-to build from, not a verified deliverable.
+`./gradlew assembleDebug` and `./gradlew testDebugUnitTest` both pass (9 unit
+tests, `ui/home` and `ui/support` ViewModels, via a hand-rolled `FakeApiService`).
+This was verified in a sandbox with an Android SDK (platform 34, build-tools
+34.0.0) but **no emulator or physical device available** (no `/dev/kvm`, no
+virtualization CPU flags in that container) — so the app has never actually
+been run and its UI/navigation has not been exercised end-to-end. Getting it
+onto a real emulator or device (see below) and walking the golden path
+(register → OTP → KYC → issue card → topup/withdrawal → support ticket) is
+the next real gap to close.
 
 ## Stack
 
@@ -25,19 +25,43 @@ Kotlin · Jetpack Compose · Material 3 · Navigation Compose · Retrofit +
 kotlinx.serialization · Room (local cache) · EncryptedSharedPreferences ·
 androidx.biometric
 
-## Running against the backend
+## Running locally
 
-The emulator reaches the host machine's `localhost` via `10.0.2.2` — see
-`API_BASE_URL` in `app/build.gradle.kts`. Start the backend first:
+Prerequisites: Android Studio (bundles a compatible JDK) or a standalone
+Android SDK + JDK 17+. No global Gradle install needed — `./gradlew` bundled
+in this repo downloads the right Gradle version (8.14.3) on first run.
 
-```bash
-cd ../backend
-docker compose up -d postgres redis
-alembic upgrade head
-uvicorn app.main:app --reload
-```
+1. **Start the backend** (needs Postgres + Redis):
 
-Then open `mobile/` in Android Studio and run on an emulator or device.
+   ```bash
+   cd ../backend
+   docker compose up -d postgres redis
+   alembic upgrade head
+   uvicorn app.main:app --reload
+   ```
+
+2. **Open `mobile/` in Android Studio** and let Gradle sync (first sync
+   downloads AGP/Kotlin/Compose/AndroidX — can take a few minutes). Or from
+   a terminal: `./gradlew assembleDebug`.
+
+3. **Run on an emulator** (AVD Manager → create a device, any API 26+) or a
+   **physical device** (enable USB debugging, plug in via USB).
+   - Emulator: no config needed — it already reaches the host's `localhost`
+     via `10.0.2.2` (see `API_BASE_URL` in `app/build.gradle.kts`).
+   - Physical device on the same network: change `API_BASE_URL` to your
+     machine's LAN IP (`http://192.168.x.x:8000/`), or run
+     `adb reverse tcp:8000 tcp:8000` to forward the device's `localhost:8000`
+     to your machine instead.
+
+4. Hit the green Run button in Android Studio, or `./gradlew installDebug`
+   then launch the app manually. No real SMS is sent in sandbox mode — the
+   OTP screen tells you to check the server logs, and that's literal: the
+   backend logs `[SANDBOX OTP] phone=... code=...` to its own terminal
+   output on every register/login, so just read the code from the terminal
+   where `uvicorn` is running and type it in.
+
+5. **Run the unit tests**: `./gradlew testDebugUnitTest` (or via Android
+   Studio's test runner on `app/src/test`).
 
 ## Architecture (MVVM + repository pattern)
 
@@ -73,5 +97,8 @@ Key rules carried over from the backend's discipline:
 - Push notifications (FCM/OneSignal) are not wired up — the spec marks this
   optional ("seulement si le temps le permet"); only in-app notifications
   (polling `GET /notifications`) are implemented.
-- No automated instrumentation/unit tests yet (the backend's pytest suite
-  covers the business logic these screens call).
+- Unit test coverage (`app/src/test`) currently covers `HomeViewModel` and
+  `SupportListViewModel` only. Extend to the rest (topup, withdrawal, cards,
+  KYC) by reusing `FakeApiService` — most of the boilerplate is already there.
+- No instrumented/UI tests (`app/src/androidTest`) — would need a real device
+  or emulator to run, which no environment has had access to yet.
